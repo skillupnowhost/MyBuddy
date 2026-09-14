@@ -7,6 +7,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 from app.db.types import GUID
 
+# GENERAL matches Vector's original behavior exactly (unchanged prompt/defaults). The other
+# three bias generation toward illustration/logo/icon conventions — see
+# vector_service.py's _PURPOSE_GUIDANCE and config.py's vector_purpose_defaults.
+VECTOR_DOCUMENT_PURPOSES = ("GENERAL", "ILLUSTRATION", "LOGO", "ICON")
+
 
 class VectorDocument(Base):
     __tablename__ = "vector_documents"
@@ -16,6 +21,7 @@ class VectorDocument(Base):
         GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
+    purpose: Mapped[str] = mapped_column(String(20), nullable=False, default="GENERAL")
     canvas_width: Mapped[int] = mapped_column(Integer, nullable=False)
     canvas_height: Mapped[int] = mapped_column(Integer, nullable=False)
     background_color: Mapped[str | None] = mapped_column(String(30), nullable=True)

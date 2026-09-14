@@ -42,7 +42,23 @@ Valid object_type values and their props:
 - POLYGON: points (list of [x, y] pairs, at least 3), fill, stroke, stroke_width, opacity
 - PATH: d (SVG path data using only M/L/H/V/C/S/Q/T/A/Z commands and numbers), fill, stroke, stroke_width, opacity
 - TEXT: x, y, content, font_size, fill
-fill/stroke must be "none", a #hex color, or a common CSS color name. Use at most {max_objects} objects."""
+fill/stroke must be "none", a #hex color, or a common CSS color name. Use at most {max_objects} objects.
+{purpose_guidance}"""
+
+# MyBuddy Illustrator presets: GENERAL is an empty string, so a GENERAL request's prompt is
+# byte-for-byte identical to Vector's original prompt — this phase changes nothing for
+# existing documents/behavior. The other three only ever influence this generation prompt,
+# never the stored object schema, edit mechanism, or renderer.
+_PURPOSE_GUIDANCE: dict[str, str] = {
+    "GENERAL": "",
+    "ILLUSTRATION": "Create a richer, more detailed illustrative scene using varied shapes and "
+    "paths, layered with sensible z-index ordering.",
+    "LOGO": "Design a simple, bold, instantly recognizable logo mark. Prefer 2-4 objects, a "
+    "limited color palette (2-3 colors), and clean geometric or iconic shapes — avoid fine "
+    "detail that won't read at small sizes.",
+    "ICON": "Design an extremely simple, single-color-friendly icon glyph readable at a small "
+    "size. Prefer 1-4 objects and minimal detail.",
+}
 
 _EDIT_SYSTEM_PROMPT = """You are editing an existing vector scene. Here is the current scene \
 as a numbered list of objects:
@@ -80,10 +96,13 @@ def _describe_objects(objects: list[VectorObject]) -> str:
 
 
 async def generate_scene(
-    llm_client, model: str, prompt: str, max_objects: int, max_retries: int
+    llm_client, model: str, prompt: str, max_objects: int, max_retries: int, purpose: str = "GENERAL"
 ) -> list[VectorObjectCreate]:
+    system_prompt = _SCENE_SYSTEM_PROMPT.format(
+        max_objects=max_objects, purpose_guidance=_PURPOSE_GUIDANCE.get(purpose, "")
+    ).rstrip()
     messages = [
-        {"role": "system", "content": _SCENE_SYSTEM_PROMPT.format(max_objects=max_objects)},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": prompt},
     ]
 

@@ -197,6 +197,73 @@ def test_color_rejects_invalid_value():
         RectProps(x=0, y=0, width=10, height=10, fill="javascript:alert(1)")
 
 
+def test_logo_purpose_uses_smaller_default_canvas_and_object_cap(client, db_session):
+    _use_mock(MockProvider(reply=VALID_SCENE_REPLY))
+    try:
+        token = _register_and_login(client, "vector-logo@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        resp = client.post(
+            "/api/v1/vector/documents",
+            json={"prompt": "a logo for a coffee shop", "purpose": "LOGO"},
+            headers=headers,
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["purpose"] == "LOGO"
+        assert body["canvas_width"] == 200
+        assert body["canvas_height"] == 200
+    finally:
+        _clear_mock()
+
+
+def test_explicit_canvas_size_overrides_purpose_default(client, db_session):
+    _use_mock(MockProvider(reply=VALID_SCENE_REPLY))
+    try:
+        token = _register_and_login(client, "vector-icon-override@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        resp = client.post(
+            "/api/v1/vector/documents",
+            json={"prompt": "an icon", "purpose": "ICON", "canvas_width": 128, "canvas_height": 128},
+            headers=headers,
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["canvas_width"] == 128
+        assert body["canvas_height"] == 128
+    finally:
+        _clear_mock()
+
+
+def test_unknown_purpose_rejected(client):
+    token = _register_and_login(client, "vector-badpurpose@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    resp = client.post(
+        "/api/v1/vector/documents",
+        json={"prompt": "anything", "purpose": "NOT_A_REAL_PURPOSE"},
+        headers=headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_default_purpose_is_general_and_unchanged(client, db_session):
+    _use_mock(MockProvider(reply=VALID_SCENE_REPLY))
+    try:
+        token = _register_and_login(client, "vector-default-purpose@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        resp = client.post("/api/v1/vector/documents", json={"prompt": "anything"}, headers=headers)
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["purpose"] == "GENERAL"
+        assert body["canvas_width"] == 400
+        assert body["canvas_height"] == 400
+    finally:
+        _clear_mock()
+
+
 def test_vector_document_isolated_per_user(client, db_session):
     _use_mock(MockProvider(reply=VALID_SCENE_REPLY))
     try:

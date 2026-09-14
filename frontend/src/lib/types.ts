@@ -201,6 +201,7 @@ export interface ImageEditJobItem {
 }
 
 export type VectorObjectType = "RECT" | "CIRCLE" | "ELLIPSE" | "LINE" | "POLYGON" | "PATH" | "TEXT";
+export type VectorDocumentPurpose = "GENERAL" | "ILLUSTRATION" | "LOGO" | "ICON";
 
 export interface VectorObjectItem {
   id: string;
@@ -215,6 +216,7 @@ export interface VectorObjectItem {
 export interface VectorDocumentItem {
   id: string;
   title: string;
+  purpose: VectorDocumentPurpose;
   canvas_width: number;
   canvas_height: number;
   background_color: string | null;

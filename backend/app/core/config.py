@@ -87,10 +87,19 @@ class Settings(BaseSettings):
     # No dedicated model setting: generation is plain JSON-producing text generation, not a
     # specialized capability like vision/code, so it reuses settings.ollama_model directly
     # rather than pulling a third model at startup.
-    vector_max_objects_per_document: int = 50
+    vector_max_objects_per_document: int = 100  # hard ceiling; must stay >= every purpose's max_objects below
     vector_max_retries: int = 1  # JSON-repair retry count on invalid scene/operation output
     vector_canvas_max_width: int = 2000
     vector_canvas_max_height: int = 2000
+    # Per-purpose defaults for MyBuddy Illustrator presets (General/Illustration/Logo/Icon) —
+    # used only when a request doesn't specify canvas_width/height explicitly. Still capped by
+    # vector_canvas_max_width/height and vector_max_objects_per_document above regardless.
+    vector_purpose_defaults: dict = {
+        "GENERAL": {"canvas_width": 400, "canvas_height": 400, "max_objects": 50},
+        "ILLUSTRATION": {"canvas_width": 600, "canvas_height": 600, "max_objects": 80},
+        "LOGO": {"canvas_width": 200, "canvas_height": 200, "max_objects": 15},
+        "ICON": {"canvas_width": 64, "canvas_height": 64, "max_objects": 8},
+    }
 
     # --- Sandbox (code execution, ADMIN-only) ---
     # This runs submitted code as a plain OS subprocess, not a container — no filesystem

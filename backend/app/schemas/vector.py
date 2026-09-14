@@ -134,10 +134,16 @@ class VectorObjectRead(BaseModel):
     updated_at: datetime
 
 
+VectorDocumentPurpose = Literal["GENERAL", "ILLUSTRATION", "LOGO", "ICON"]
+
+
 class VectorDocumentCreate(BaseModel):
     prompt: str
-    canvas_width: int = 400
-    canvas_height: int = 400
+    purpose: VectorDocumentPurpose = "GENERAL"
+    # None means "use this purpose's default" (see settings.vector_purpose_defaults) rather
+    # than hard-coding General's 400x400 here — an explicit value still always overrides it.
+    canvas_width: int | None = None
+    canvas_height: int | None = None
 
 
 class VectorDocumentRead(BaseModel):
@@ -145,6 +151,7 @@ class VectorDocumentRead(BaseModel):
 
     id: uuid.UUID
     title: str
+    purpose: VectorDocumentPurpose
     canvas_width: int
     canvas_height: int
     background_color: str | None

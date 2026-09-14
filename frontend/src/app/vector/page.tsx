@@ -14,7 +14,14 @@ import {
   getVectorDocument,
   listVectorDocuments,
 } from "@/lib/vector";
-import type { VectorDocumentItem, VectorObjectItem } from "@/lib/types";
+import type { VectorDocumentItem, VectorDocumentPurpose, VectorObjectItem } from "@/lib/types";
+
+const PURPOSE_OPTIONS: { value: VectorDocumentPurpose; label: string }[] = [
+  { value: "GENERAL", label: "General" },
+  { value: "ILLUSTRATION", label: "Illustration" },
+  { value: "LOGO", label: "Logo" },
+  { value: "ICON", label: "Icon" },
+];
 
 export default function VectorPage() {
   const router = useRouter();
@@ -22,6 +29,7 @@ export default function VectorPage() {
   const [activeDocument, setActiveDocument] = useState<VectorDocumentItem | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
+  const [purpose, setPurpose] = useState<VectorDocumentPurpose>("GENERAL");
   const [instruction, setInstruction] = useState("");
   const [generating, setGenerating] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -51,7 +59,7 @@ export default function VectorPage() {
     setError(null);
     setGenerating(true);
     try {
-      const doc = await createVectorDocument(trimmed);
+      const doc = await createVectorDocument(trimmed, purpose);
       setDocuments((prev) => [doc, ...prev]);
       setActiveDocument(doc);
       setSelectedId(null);
@@ -138,6 +146,17 @@ export default function VectorPage() {
               rows={3}
               className="w-full resize-none rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500"
             />
+            <select
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value as VectorDocumentPurpose)}
+              className="w-full rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1.5 text-xs text-white"
+            >
+              {PURPOSE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
             <button
               onClick={handleGenerate}
               disabled={!prompt.trim() || generating}

@@ -53,8 +53,13 @@ async def create_vector_document(
     user: User = Depends(get_current_user),
     llm_client: LLMProvider = Depends(get_llm_client),
 ):
-    if not (1 <= payload.canvas_width <= settings.vector_canvas_max_width) or not (
-        1 <= payload.canvas_height <= settings.vector_canvas_max_height
+    purpose_defaults = settings.vector_purpose_defaults[payload.purpose]
+    canvas_width = payload.canvas_width if payload.canvas_width is not None else purpose_defaults["canvas_width"]
+    canvas_height = payload.canvas_height if payload.canvas_height is not None else purpose_defaults["canvas_height"]
+    max_objects = min(purpose_defaults["max_objects"], settings.vector_max_objects_per_document)
+
+    if not (1 <= canvas_width <= settings.vector_canvas_max_width) or not (
+        1 <= canvas_height <= settings.vector_canvas_max_height
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -64,7 +69,7 @@ async def create_vector_document(
 
     try:
         object_creates = await generate_scene(
-            llm_client, settings.ollama_model, payload.prompt, settings.vector_max_objects_per_document, settings.vector_max_retries
+            llm_client, settings.ollama_model, payload.prompt, max_objects, settings.vector_max_retries, payload.purpose
         )
     except VectorGenerationError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
@@ -72,8 +77,9 @@ async def create_vector_document(
     document = VectorDocument(
         user_id=user.id,
         title=payload.prompt[:255],
-        canvas_width=payload.canvas_width,
-        canvas_height=payload.canvas_height,
+        purpose=payload.purpose,
+        canvas_width=canvas_width,
+        canvas_height=canvas_height,
     )
     db.add(document)
     db.flush()

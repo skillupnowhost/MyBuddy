@@ -1,14 +1,15 @@
 import { apiFetch, apiJson } from "./api";
-import type { VectorDocumentItem, VectorObjectItem, VectorObjectType } from "./types";
+import type { VectorDocumentItem, VectorDocumentPurpose, VectorObjectItem, VectorObjectType } from "./types";
 
 export function createVectorDocument(
   prompt: string,
+  purpose: VectorDocumentPurpose = "GENERAL",
   canvasWidth?: number,
   canvasHeight?: number,
 ): Promise<VectorDocumentItem> {
   return apiJson<VectorDocumentItem>("/api/v1/vector/documents", {
     method: "POST",
-    body: JSON.stringify({ prompt, canvas_width: canvasWidth, canvas_height: canvasHeight }),
+    body: JSON.stringify({ prompt, purpose, canvas_width: canvasWidth, canvas_height: canvasHeight }),
   });
 }
 
