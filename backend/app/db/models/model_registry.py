@@ -13,6 +13,11 @@ from app.db.types import GUID
 # demotes the previous holder to ARCHIVED (never deleted, so rollback can restore it).
 MODEL_REGISTRY_STATUSES = ("EXPERIMENTAL", "CANARY", "STAGING", "PRODUCTION", "ARCHIVED", "REJECTED")
 
+# Only LOCAL (Ollama) is implemented — no cloud provider has an API key configured on this
+# deployment by design (see FrontierModelRouter). The column exists so a future provider is
+# a new value + a new Provider class here, not a schema change.
+MODEL_PROVIDERS = ("LOCAL",)
+
 
 class RegisteredModel(Base):
     """A deployable model artifact — either the base model or a completed fine-tune.
@@ -25,6 +30,7 @@ class RegisteredModel(Base):
     version: Mapped[str] = mapped_column(String(50), nullable=False, default="v1")
     base_model: Mapped[str] = mapped_column(String(255), nullable=False)
     capability: Mapped[str] = mapped_column(String(50), nullable=False, default="TEXT")
+    provider: Mapped[str] = mapped_column(String(50), nullable=False, default="LOCAL")
     training_job_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID(), ForeignKey("training_jobs.id", ondelete="SET NULL"), nullable=True
     )

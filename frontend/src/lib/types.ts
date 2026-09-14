@@ -93,6 +93,7 @@ export interface RegisteredModelItem {
   version: string;
   base_model: string;
   capability: string;
+  provider: string;
   quantization: string | null;
   location: string;
   status: ModelStatus;

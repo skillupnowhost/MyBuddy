@@ -243,6 +243,39 @@ The final Creative Platform sub-phase, from `/creative` — orchestrates the oth
 
 This completes all five Creative Platform sub-phases from the original spec (Vector → Illustrator → Animator → Motion → Creative Director).
 
+## Model registry & router (Phase 15)
+
+The first sub-phase of the unified model router (roadmap phase 9). Model selection used to
+be hardcoded per capability (`OLLAMA_MODEL`, `OLLAMA_CODE_MODEL`, `OLLAMA_VISION_MODEL`,
+`OLLAMA_EMBEDDING_MODEL` read directly in `chat_service.py`). It's now driven by the same
+`registered_models` table the fine-tuning promotion lifecycle already uses (Phase 4) — a
+fine-tune artifact and a discovered base model are both just rows, distinguished only by
+whether `training_job_id` is set.
+
+- **Discovery**: `POST /admin/models/discover` (admin-only) scans what's actually installed
+  in the local Ollama server and registers anything new as `EXPERIMENTAL`, with a
+  capability guessed from the model name (`coder` → CODE, `moondream`/`llava` → VISION,
+  `minilm`/`embed`/`bge`/`nomic` → EMBEDDING, else TEXT). An admin still has to promote a
+  discovered model to `PRODUCTION` before the router will ever select it — discovery alone
+  changes nothing about what chat actually uses.
+- **`FrontierModelRouter.select(db, capability, mode)`**: picks the highest-`eval_score`
+  `PRODUCTION` model for a capability. If nothing is registered yet, it lazily registers the
+  settings-configured default as `PRODUCTION` so routing is always self-healing — no startup
+  coupling required.
+- **No cloud providers are implemented, by design** — this deployment has no API keys and
+  the project's explicit choice is free/local-only for now. Every `RegisteredModel` has a
+  `provider` column (`LOCAL` is the only value used today) specifically so a future provider
+  is a new value + a new class, not a schema change. `mode` currently accepts `AUTO` and
+  `PRIVATE`; they behave identically today (everything is already local) but the contract
+  won't need to change once a second provider tier exists. `FAST`/`BEST`/`CHEAP`/`MAXIMUM`
+  are deliberately not implemented — with one provider tier they'd be no-op aliases for
+  `AUTO`, and faking differentiation would be dishonest.
+- **`chat_service.py`** now resolves TEXT/CODE/VISION capability through the router instead
+  of reading settings directly. An explicit `conversation.model` pin still wins for
+  TEXT/CODE — unchanged behavior for anyone who already pinned a model — but an attached
+  image still forces the VISION-capability model regardless of any pin, since a pinned
+  non-vision model can't process images (same override the vision phase already relied on).
+
 ## Research track (Phase 6)
 
 `research/` contains a from-scratch, from-random-initialization transformer (RoPE, causal attention, RMSNorm, SwiGLU) and a training loop — real, correct code, syntax-verified, but not executed live here (same hardware reasoning as fine-tuning, see `research/README.md`). This is a separate, educational scaffold from both the main app and the fine-tuning pipeline.
@@ -280,6 +313,7 @@ This completes all five Creative Platform sub-phases from the original spec (Vec
 | 12 | MyBuddy Animator — SVG/CSS animation targeting an existing Vector document | Done, verified via test suite |
 | 13 | MyBuddy Motion — composes multiple Animator animations into one sequence | Done, verified via test suite |
 | 14 | MyBuddy Creative Director — brand kits + cross-asset projects orchestrating Vector/Animator/Motion (completes the Creative Platform expansion) | Done, verified via test suite |
+| 15 | Model registry & router — local-model discovery, capability-based routing (first sub-phase of the unified model router; roadmap phase 8, Astro, explicitly skipped pending a C compiler) | Done, verified via test suite + live discovery against a running Ollama instance |
 
 Each phase's abstractions (`LLMProvider`, `EmbeddingProvider`, `VectorStoreProvider`, `Tool`, `CodeVectorStoreProvider`, `SandboxProvider`) mean later work rarely touches earlier code — e.g. tools were added without changing how RAG or memory work, Code was added without changing how document RAG or fine-tuning work, Vision needed no `LLMProvider` signature change at all (just a richer message-dict shape it already passed through unmodified), Image reused Vision's `images` table/endpoint outright instead of building a second image-storage mechanism, Image Edit reused both Image's `imagegen/` subprocess convention and the same `images` table outright instead of building a third, Vector extended the existing tool-calling fenced-block convention into a validated structured-output pattern instead of inventing a new one, Animator reused Vector's generation mechanism, prop validation, and SVG renderer outright rather than building a parallel animation stack, Motion reused Animator's renderer and easing/prop tables outright for a pure compositing/timing layer with no generation step of its own, and Creative Director reused Vector's generation function outright (extracted into a shared service function) instead of inventing a second orchestration protocol.
 

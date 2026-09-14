@@ -46,3 +46,7 @@ export function promoteModel(id: string, status: string): Promise<RegisteredMode
     body: JSON.stringify({ status }),
   });
 }
+
+export function discoverModels(): Promise<RegisteredModelItem[]> {
+  return apiJson<RegisteredModelItem[]>("/api/v1/admin/models/discover", { method: "POST" });
+}

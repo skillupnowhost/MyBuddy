@@ -13,7 +13,9 @@ from app.db.models.message import Message
 from app.db.models.training_job import TrainingJob
 from app.db.models.user import User
 from app.schemas.admin import AdminStats, AdminUserRead, RoleUpdate, SystemHealth
+from app.schemas.training import RegisteredModelRead
 from app.services.llm_client import get_llm_client
+from app.services.model_registry_service import discover_local_models
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -57,6 +59,15 @@ def get_stats(db: Session = Depends(get_db), _admin: User = Depends(get_current_
         total_memories=db.query(Memory).count(),
         total_training_jobs=db.query(TrainingJob).count(),
     )
+
+
+@router.post("/models/discover", response_model=list[RegisteredModelRead])
+async def discover_models(db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)):
+    """Scans what's actually installed in the local Ollama server and registers anything new
+    as EXPERIMENTAL (see model_registry_service.discover_local_models). Admin-only, and
+    discovery alone never makes a model selectable by the router — it still needs an explicit
+    promotion to PRODUCTION via PATCH /models/registry/{id}/promote."""
+    return await discover_local_models(db, get_llm_client())
 
 
 @router.get("/health", response_model=SystemHealth)

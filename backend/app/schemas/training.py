@@ -26,7 +26,7 @@ class TrainingJobCreate(BaseModel):
     epochs: int = 1
     learning_rate: float = 2e-4
     lora_r: int = 8
-    capability: Literal["TEXT", "CODE"] = "TEXT"
+    capability: Literal["TEXT", "CODE", "VISION", "EMBEDDING"] = "TEXT"
 
 
 class TrainingJobRead(BaseModel):
@@ -52,6 +52,7 @@ class RegisteredModelRead(BaseModel):
     version: str
     base_model: str
     capability: str
+    provider: str
     quantization: str | None
     location: str
     status: ModelStatus

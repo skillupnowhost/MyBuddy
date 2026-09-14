@@ -9,6 +9,7 @@ import {
   cancelTrainingJob,
   createTrainingJob,
   deleteDataset,
+  discoverModels,
   listDatasets,
   listRegisteredModels,
   listTrainingJobs,
@@ -97,6 +98,17 @@ export default function FinetunePage() {
   async function handlePromote(id: string, status: ModelStatus) {
     const updated = await promoteModel(id, status);
     setModels((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+  }
+
+  async function handleDiscover() {
+    setError(null);
+    try {
+      const found = await discoverModels();
+      if (found.length === 0) return;
+      setModels((prev) => [...found, ...prev]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not discover local models.");
+    }
   }
 
   const validatedDatasets = datasets.filter((d) => d.status === "VALIDATED");
@@ -209,7 +221,21 @@ export default function FinetunePage() {
         </section>
 
         <section className="rounded-xl border border-white/10 bg-[#161922] p-4">
-          <h2 className="mb-3 text-sm font-medium text-white/70">Model registry</h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-medium text-white/70">Model registry</h2>
+            {isAdmin && (
+              <button
+                onClick={handleDiscover}
+                className="rounded-lg border border-white/10 px-3 py-1 text-xs text-white/70 hover:border-blue-500 hover:text-white"
+              >
+                Discover local models
+              </button>
+            )}
+          </div>
+          <p className="mb-3 text-xs text-white/40">
+            Only local Ollama models are supported right now (no cloud provider keys configured, by design). The
+            router picks the highest-scoring PRODUCTION model per capability for chat automatically.
+          </p>
           <div className="space-y-1">
             {models.map((model) => (
               <div key={model.id} className="flex items-center justify-between rounded-lg px-2 py-2 text-sm hover:bg-white/5">
@@ -218,6 +244,8 @@ export default function FinetunePage() {
                     {model.name} <span className="text-white/40">({model.base_model})</span>
                   </p>
                   <p className="text-xs text-white/40">
+                    <span className="rounded bg-white/10 px-1.5 py-0.5">{model.capability}</span>{" "}
+                    <span className="rounded bg-white/10 px-1.5 py-0.5">{model.provider}</span>{" "}
                     {model.status}
                     {model.eval_score !== null ? ` · eval: ${model.eval_score}` : ""}
                   </p>

@@ -16,6 +16,7 @@ from app.services.code_vector_store import CodeVectorStoreProvider
 from app.services.embedding_provider import EmbeddingProvider
 from app.services.llm_provider import LLMProvider
 from app.services.memory_service import extract_and_save_memories, get_memory_context
+from app.services.model_router import get_model_router
 from app.services.rag_service import build_rag_prompt, retrieve_context
 from app.services.tools import get_tools_system_prompt, maybe_run_tool_call
 from app.services.vector_store import VectorStoreProvider
@@ -92,7 +93,16 @@ async def stream_assistant_reply(
 
         db.refresh(conversation)
 
-        model = settings.ollama_vision_model if attached_images else (conversation.model or settings.ollama_model)
+        if attached_images:
+            # A pinned conversation.model can't see images (most local models aren't
+            # vision-capable) — vision must override the pin, same as before this router
+            # existed, not just apply when nothing is pinned.
+            model = get_model_router().select(db, "VISION").base_model
+        elif conversation.model:
+            model = conversation.model
+        else:
+            capability = "CODE" if conversation.code_project_id else "TEXT"
+            model = get_model_router().select(db, capability).base_model
         memory_context = get_memory_context(db, conversation.user_id)
         history = _history_for_ollama(conversation, memory_context)
 
