@@ -6,11 +6,13 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_current_user, get_db
 from app.db.models.code_project import CodeProject
 from app.db.models.conversation import Conversation
+from app.db.models.expert_pipeline_step import ExpertPipelineStep
 from app.db.models.max_mode_candidate import MaxModeCandidate
 from app.db.models.message import Message
 from app.db.models.user import User
 from app.schemas.arena import MaxModeCandidateRead
 from app.schemas.conversation import ConversationCreate, ConversationDetail, ConversationRead, ConversationUpdate
+from app.schemas.expert_pipeline import ExpertPipelineStepRead
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -33,6 +35,17 @@ def _validate_code_project(db: Session, code_project_id: uuid.UUID | None, user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Code project not found")
 
 
+def _validate_reply_mode_exclusivity(max_mode_enabled: bool, expert_pipeline_enabled: bool) -> None:
+    """MAX mode and the Expert Pipeline are alternate reply strategies for the same turn
+    (see chat_service.stream_assistant_reply) — enabling both would leave it ambiguous which
+    one actually runs, so reject the combination outright rather than picking one silently."""
+    if max_mode_enabled and expert_pipeline_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="max_mode_enabled and expert_pipeline_enabled cannot both be true",
+        )
+
+
 @router.get("", response_model=list[ConversationRead])
 def list_conversations(
     db: Session = Depends(get_db),
@@ -53,6 +66,7 @@ def create_conversation(
     user: User = Depends(get_current_user),
 ):
     _validate_code_project(db, payload.code_project_id, user)
+    _validate_reply_mode_exclusivity(payload.max_mode_enabled, payload.expert_pipeline_enabled)
     conversation = Conversation(
         user_id=user.id,
         title=payload.title or "New conversation",
@@ -61,6 +75,7 @@ def create_conversation(
         rag_enabled=payload.rag_enabled,
         tools_enabled=payload.tools_enabled,
         max_mode_enabled=payload.max_mode_enabled,
+        expert_pipeline_enabled=payload.expert_pipeline_enabled,
         code_project_id=payload.code_project_id,
     )
     db.add(conversation)
@@ -89,6 +104,9 @@ def update_conversation(
     updates = payload.model_dump(exclude_unset=True)
     if "code_project_id" in updates:
         _validate_code_project(db, updates["code_project_id"], user)
+    resulting_max_mode = updates.get("max_mode_enabled", conversation.max_mode_enabled)
+    resulting_expert_pipeline = updates.get("expert_pipeline_enabled", conversation.expert_pipeline_enabled)
+    _validate_reply_mode_exclusivity(resulting_max_mode, resulting_expert_pipeline)
     for field, value in updates.items():
         setattr(conversation, field, value)
     db.commit()
@@ -114,6 +132,31 @@ def get_max_mode_candidates_for_message(
         db.query(MaxModeCandidate)
         .filter(MaxModeCandidate.message_id == message_id)
         .order_by(MaxModeCandidate.is_judge.asc(), MaxModeCandidate.created_at.asc())
+        .all()
+    )
+
+
+@router.get(
+    "/{conversation_id}/messages/{message_id}/expert-pipeline-steps",
+    response_model=list[ExpertPipelineStepRead],
+)
+def get_expert_pipeline_steps_for_message(
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Transparency view for an Expert-Pipeline turn: every subtask's instruction, assigned
+    model, raw output, and verified output (see expert_pipeline_service.run_expert_pipeline /
+    ExpertPipelineStep). Empty list for a normal (non-pipeline) message, not an error."""
+    _get_owned_conversation(db, conversation_id, user)
+    message = db.get(Message, message_id)
+    if message is None or message.conversation_id != conversation_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
+    return (
+        db.query(ExpertPipelineStep)
+        .filter(ExpertPipelineStep.message_id == message_id)
+        .order_by(ExpertPipelineStep.step_index.asc())
         .all()
     )
 

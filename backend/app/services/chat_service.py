@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.models.conversation import Conversation
+from app.db.models.expert_pipeline_step import ExpertPipelineStep
 from app.db.models.image import Image
 from app.db.models.max_mode_candidate import MaxModeCandidate
 from app.db.models.message import Message
@@ -16,6 +17,7 @@ from app.db.models.usage_log import UsageLog
 from app.services.code_rag_service import build_code_rag_prompt, retrieve_code_context
 from app.services.code_vector_store import CodeVectorStoreProvider
 from app.services.embedding_provider import EmbeddingProvider
+from app.services.expert_pipeline_service import ExpertPipelineError, ExpertStepResult, run_expert_pipeline
 from app.services.llm_provider import LLMProvider
 from app.services.max_mode_service import (
     MaxModeCandidateResult,
@@ -45,6 +47,17 @@ def _history_for_ollama(conversation: Conversation, memory_context: str | None) 
     for msg in conversation.messages:
         history.append({"role": msg.role, "content": msg.content})
     return history
+
+
+def _derive_title(user_content: str, max_len: int = 48) -> str:
+    """First-message auto-title, so new conversations don't all sit in history as the same
+    literal 'New conversation' string with nothing to tell them apart or search by."""
+    collapsed = " ".join(user_content.split())
+    if not collapsed:
+        return "New conversation"
+    if len(collapsed) <= max_len:
+        return collapsed
+    return collapsed[:max_len].rstrip() + "…"
 
 
 def _chunk_text(text: str, size: int = 40) -> list[str]:
@@ -93,9 +106,15 @@ async def stream_assistant_reply(
             yield f"data: {json.dumps({'error': 'Conversation not found'})}\n\n"
             return
 
+        is_first_message = conversation.title == "New conversation" and not conversation.messages
+
         user_message = Message(conversation_id=conversation.id, role="user", content=user_content)
         db.add(user_message)
         db.commit()
+
+        if is_first_message:
+            conversation.title = _derive_title(user_content)
+            db.commit()
 
         attached_images: list[Image] = []
         for image_id in image_ids or []:
@@ -110,13 +129,18 @@ async def stream_assistant_reply(
 
         capability = "CODE" if conversation.code_project_id else "TEXT"
         max_mode_candidates: list[RegisteredModel] = []
+        expert_pipeline_active = False
         if attached_images:
             # A pinned conversation.model can't see images (most local models aren't
             # vision-capable) — vision must override the pin, same as before this router
-            # existed, not just apply when nothing is pinned. MAX mode doesn't cover image
-            # turns for v1 (fan-out cost doubles per image, no judge-of-images story yet) —
-            # always falls back to the single VISION model here.
+            # existed, not just apply when nothing is pinned. Neither MAX mode nor the
+            # Expert Pipeline cover image turns for v1 (fan-out/sub-agent cost doubles per
+            # image, no vision-agent story yet) — always falls back to the single VISION
+            # model here.
             model = get_model_router().select(db, "VISION").base_model
+        elif conversation.expert_pipeline_enabled:
+            expert_pipeline_active = True
+            model = None  # resolved after generation, to the planner/synthesizer model
         else:
             if conversation.max_mode_enabled:
                 max_mode_candidates = get_max_mode_candidates(db, capability)
@@ -180,8 +204,25 @@ async def stream_assistant_reply(
         usage_sink: dict = {}
         full_reply = ""
         max_mode_results: list[MaxModeCandidateResult] = []
+        expert_pipeline_steps: list[ExpertStepResult] = []
         try:
-            if len(max_mode_candidates) >= 2:
+            if expert_pipeline_active:
+                try:
+                    full_reply, expert_pipeline_steps = await run_expert_pipeline(
+                        db, llm_client, user_content, conversation.tools_enabled
+                    )
+                except ExpertPipelineError as exc:
+                    yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+                else:
+                    model = get_model_router().select(db, "TEXT").base_model  # planner/synthesizer, for attribution
+                    yield (
+                        "data: "
+                        f"{json.dumps({'expert_pipeline_steps': [s.step.step_type for s in expert_pipeline_steps]})}"
+                        "\n\n"
+                    )
+                    for chunk in _chunk_text(full_reply):
+                        yield f"data: {json.dumps({'delta': chunk})}\n\n"
+            elif len(max_mode_candidates) >= 2:
                 full_reply, max_mode_results = await generate_max_mode_reply(llm_client, history, max_mode_candidates)
                 model = max_mode_results[-1].model.base_model  # the judge, for usage/memory attribution
                 yield f"data: {json.dumps({'max_mode_models': [r.model.base_model for r in max_mode_results]})}\n\n"
@@ -211,7 +252,23 @@ async def stream_assistant_reply(
                 assistant_message = Message(conversation_id=conversation.id, role="assistant", content=full_reply)
                 db.add(assistant_message)
                 db.commit()
-                if max_mode_results:
+                if expert_pipeline_steps:
+                    db.add_all(
+                        [
+                            ExpertPipelineStep(
+                                message_id=assistant_message.id,
+                                step_index=i,
+                                step_type=s.step.step_type,
+                                instruction=s.step.instruction,
+                                model=s.model,
+                                raw_output=s.raw_output,
+                                verified_output=s.verified_output,
+                            )
+                            for i, s in enumerate(expert_pipeline_steps)
+                        ]
+                    )
+                    db.commit()
+                elif max_mode_results:
                     db.add_all(
                         [
                             MaxModeCandidate(

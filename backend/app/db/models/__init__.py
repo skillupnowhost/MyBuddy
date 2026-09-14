@@ -27,6 +27,7 @@ from app.db.models.creative_project import CreativeProject
 from app.db.models.creative_asset import CreativeAsset
 from app.db.models.max_mode_candidate import MaxModeCandidate
 from app.db.models.arena_comparison_result import ArenaComparisonResult
+from app.db.models.expert_pipeline_step import ExpertPipelineStep
 
 __all__ = [
     "User",
@@ -58,4 +59,5 @@ __all__ = [
     "CreativeAsset",
     "MaxModeCandidate",
     "ArenaComparisonResult",
+    "ExpertPipelineStep",
 ]

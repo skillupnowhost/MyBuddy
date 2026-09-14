@@ -26,6 +26,13 @@ class Conversation(Base):
     # fewer than 2 candidates are registered, same honest scope cut as FAST/BEST/etc. in
     # model_router.py.
     max_mode_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    # Expert Collaboration Pipeline (phase 9 sub-phase 4): Planner -> Reasoning/Coding/Tool ->
+    # Verification -> Synthesizer, see expert_pipeline_service.py. Mutually exclusive with
+    # max_mode_enabled — enforced in the conversations endpoint, not here, since that check
+    # needs the *resulting* state of a partial PATCH, not just this column in isolation.
+    expert_pipeline_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     # When set, chat_service retrieves from this code project instead of the general
     # document RAG store — mutually exclusive with rag_enabled for v1.
     code_project_id: Mapped[uuid.UUID | None] = mapped_column(
