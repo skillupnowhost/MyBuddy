@@ -13,6 +13,7 @@ from app.api.v1.endpoints import (
     images,
     memories,
     models,
+    motion,
     training,
     vector,
 )
@@ -32,3 +33,4 @@ api_router.include_router(image_generation.router)
 api_router.include_router(image_edit.router)
 api_router.include_router(vector.router)
 api_router.include_router(animation.router)
+api_router.include_router(motion.router)

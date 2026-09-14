@@ -107,6 +107,10 @@ class Settings(BaseSettings):
     animation_default_frame_rate: int = 30
     animation_default_duration_ms: int = 2000
 
+    # --- Motion ---
+    motion_max_total_duration_ms: int = 30000
+    motion_max_clips: int = 20
+
     # --- Sandbox (code execution, ADMIN-only) ---
     # This runs submitted code as a plain OS subprocess, not a container — no filesystem
     # jail, no network isolation, no memory/CPU cap beyond the timeout. See

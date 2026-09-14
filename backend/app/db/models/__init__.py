@@ -19,6 +19,8 @@ from app.db.models.vector_document import VectorDocument
 from app.db.models.vector_object import VectorObject
 from app.db.models.animation_document import AnimationDocument
 from app.db.models.animation_keyframe import AnimationKeyframe
+from app.db.models.motion_project import MotionProject
+from app.db.models.motion_clip import MotionClip
 
 __all__ = [
     "User",
@@ -42,4 +44,6 @@ __all__ = [
     "VectorObject",
     "AnimationDocument",
     "AnimationKeyframe",
+    "MotionProject",
+    "MotionClip",
 ]

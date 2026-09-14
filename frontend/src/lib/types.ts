@@ -249,6 +249,28 @@ export interface AnimationDocumentItem {
   updated_at: string;
 }
 
+export interface MotionClipItem {
+  id: string;
+  animation_document_id: string;
+  start_offset_ms: number;
+  x_offset: number;
+  y_offset: number;
+  z_index: number;
+  created_at: string;
+}
+
+export interface MotionProjectItem {
+  id: string;
+  title: string;
+  canvas_width: number;
+  canvas_height: number;
+  total_duration_ms: number;
+  loop: boolean;
+  clips: MotionClipItem[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SystemHealth {
   cpu_percent: number;
   ram_used_gb: number;
