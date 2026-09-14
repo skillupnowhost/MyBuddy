@@ -200,6 +200,29 @@ export interface ImageEditJobItem {
   completed_at: string | null;
 }
 
+export type VectorObjectType = "RECT" | "CIRCLE" | "ELLIPSE" | "LINE" | "POLYGON" | "PATH" | "TEXT";
+
+export interface VectorObjectItem {
+  id: string;
+  object_type: VectorObjectType;
+  z_index: number;
+  layer_name: string;
+  props: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VectorDocumentItem {
+  id: string;
+  title: string;
+  canvas_width: number;
+  canvas_height: number;
+  background_color: string | null;
+  objects: VectorObjectItem[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SystemHealth {
   cpu_percent: number;
   ram_used_gb: number;

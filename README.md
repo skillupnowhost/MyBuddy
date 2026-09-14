@@ -2,7 +2,7 @@
 
 Your private, self-hosted AI companion. Open-source, no paid inference API required.
 
-This build covers **Phases 1-5, 7, and 8** end to end: real local LLM chat, RAG, long-term memory, opt-in tool calling, fine-tuning infrastructure, an admin dashboard, MyBuddy Code (code chat, code RAG over uploaded projects, an in-browser editor, and admin-only sandboxed execution), and MyBuddy Vision (attach images to any chat message for a vision-capable local model to answer about). **Phases 6, 9, and 10** (a from-scratch research model, MyBuddy Image text-to-image generation, and MyBuddy Image Edit) have real, correct, syntax-verified code that hasn't been executed end-to-end on this particular dev machine (no GPU, and for Phases 9-10 no `imagegen/.venv` provisioned) — see `research/README.md` and `imagegen/README.md` for why. See [Roadmap](#roadmap) for the phase-by-phase breakdown.
+This build covers **Phases 1-5, 7, 8, and 11** end to end: real local LLM chat, RAG, long-term memory, opt-in tool calling, fine-tuning infrastructure, an admin dashboard, MyBuddy Code (code chat, code RAG over uploaded projects, an in-browser editor, and admin-only sandboxed execution), MyBuddy Vision (attach images to any chat message for a vision-capable local model to answer about), and MyBuddy Vector (natural-language-generated, genuinely editable SVG). **Phases 6, 9, and 10** (a from-scratch research model, MyBuddy Image text-to-image generation, and MyBuddy Image Edit) have real, correct, syntax-verified code that hasn't been executed end-to-end on this particular dev machine (no GPU, and for Phases 9-10 no `imagegen/.venv` provisioned) — see `research/README.md` and `imagegen/README.md` for why. See [Roadmap](#roadmap) for the phase-by-phase breakdown.
 
 ## Architecture
 
@@ -200,6 +200,17 @@ Inpainting, outpainting, and background removal from `/image-edit`. Runs as a **
 
 **Hardware reality check** (same honest standard as Fine-tuning/Image generation): `IMAGE_EDIT_MODEL` defaults to `runwayml/stable-diffusion-inpainting`, a standard (non-distilled) SD1.5 inpainting checkpoint — there's no turbo-style inpainting model as established as `sd-turbo` is for text-to-image, so inpaint/outpaint are honestly slower than Phase 9's generation path on CPU. If `imagegen/.venv` isn't set up, a real job correctly goes `PENDING → RUNNING → FAILED` with a clear "install image editing dependencies" message.
 
+## MyBuddy Vector (Phase 11)
+
+Describe something in natural language from `/vector` and get back a genuine, editable SVG — never a raster image, never a PNG wrapped in an `<image>` tag. This is the first sub-phase of the Creative Platform expansion (Vector → Illustrator → Animator → Motion → Creative Director); the rest are future work.
+
+Unlike Image/Image Edit, this runs **inline in the API process, not a subprocess** — generating a scene is plain JSON-producing text generation through the same `OllamaProvider` regular chat already uses (`settings.ollama_model`, no dedicated model setting needed).
+
+- **Pipeline**: prompt → the model produces a constrained JSON scene graph (fenced ` ```vector-scene ` block, same convention as the existing tool-calling protocol) → Pydantic-validated against a closed set of object types (rect/circle/ellipse/line/polygon/path/text) → stored as `VectorDocument`/`VectorObject` rows → rendered to real `<svg>` markup only by a first-party renderer, never by the model directly.
+- **Why no SVG sanitization library was needed**: the model never produces SVG/XML text at all — only typed JSON. Colors are checked against a hex/named-color allowlist, path data against a strict path-command character allowlist, and text content is XML-escaped, all before ever becoming part of an attribute or element. The renderer is the only code that ever emits a `<tag>`, from data that's already validated — "restricted by construction," the same approach this project already uses for the calculator tool and the code-zip path-traversal guards.
+- **Structured edits**: "make the circle red" doesn't regenerate the scene — it resolves to a typed operation (`SET_PROP`/`ADD_OBJECT`/`DELETE_OBJECT`/`REORDER`) and a targeted mutation of just that object. The AI-edit endpoint and the manual property-panel edits in `/vector` both go through the exact same `apply_operation()` function.
+- **Honest limitation**: a full scene graph is a harder structured-output task for a small local model than a single tool call. Generation/edit requests get one automatic repair retry (the parse error is fed back to the model); if that still fails, the request returns a clear error rather than a garbage or empty document.
+
 ## Research track (Phase 6)
 
 `research/` contains a from-scratch, from-random-initialization transformer (RoPE, causal attention, RMSNorm, SwiGLU) and a training loop — real, correct code, syntax-verified, but not executed live here (same hardware reasoning as fine-tuning, see `research/README.md`). This is a separate, educational scaffold from both the main app and the fine-tuning pipeline.
@@ -210,7 +221,8 @@ Inpainting, outpainting, and background removal from `/image-edit`. Runs as a **
 - JWT access tokens (short-lived) + refresh tokens; every conversation/chat/model/document/memory/dataset/training/admin route requires a valid access token, and admin routes additionally require the `ADMIN` role.
 - CORS restricted to `FRONTEND_ORIGIN`.
 - Auth endpoints rate-limited.
-- Every user-owned row (conversations, messages, documents, chunks, memories, datasets, training jobs, code projects, sandbox executions, images, image generation jobs, image edit jobs) is scoped to `user_id` in every query — no cross-user access, verified by automated tests including deliberate cross-user access attempts.
+- Every user-owned row (conversations, messages, documents, chunks, memories, datasets, training jobs, code projects, sandbox executions, images, image generation jobs, image edit jobs, vector documents/objects) is scoped to `user_id` in every query — no cross-user access, verified by automated tests including deliberate cross-user access attempts.
+- MyBuddy Vector never lets the model produce raw SVG/XML — only a Pydantic-validated JSON scene graph, with colors and path data checked against strict allowlists before a first-party renderer ever turns them into markup. See "MyBuddy Vector" above.
 - Uploaded files are stored under a randomized filename (never the client-supplied name), namespaced by user id, outside any web-served path; content-type and size are validated before anything touches disk.
 - The calculator tool uses an AST-based restricted evaluator, never Python's `eval()` — arbitrary code execution is not reachable through it.
 - Code execution (`/code`'s "Run" button) IS arbitrary code execution, deliberately, and is gated to `ADMIN` accounts only — see "Sandbox execution" under MyBuddy Code above for exactly what its subprocess-based isolation does and does not protect against.
@@ -232,8 +244,9 @@ Inpainting, outpainting, and background removal from `/image-edit`. Runs as a **
 | 8 | MyBuddy Vision — attach images to chat, auto vision-model switch per turn | Done, verified via test suite (see note below) |
 | 9 | MyBuddy Image — text-to-image generation as a separate process, reuses Vision's image storage | Code complete, syntax-verified; fails correctly without a GPU/`imagegen/.venv` |
 | 10 | MyBuddy Image Edit — inpaint/outpaint/background removal, a second script in the same `imagegen/` venv | Code complete, syntax-verified; fails correctly without a GPU/`imagegen/.venv` |
+| 11 | MyBuddy Vector — natural-language-generated, structurally editable SVG (first Creative Platform sub-phase) | Done, verified via test suite |
 
-Each phase's abstractions (`LLMProvider`, `EmbeddingProvider`, `VectorStoreProvider`, `Tool`, `CodeVectorStoreProvider`, `SandboxProvider`) mean later work rarely touches earlier code — e.g. tools were added without changing how RAG or memory work, Code was added without changing how document RAG or fine-tuning work, Vision needed no `LLMProvider` signature change at all (just a richer message-dict shape it already passed through unmodified), Image reused Vision's `images` table/endpoint outright instead of building a second image-storage mechanism, and Image Edit reused both Image's `imagegen/` subprocess convention and the same `images` table outright instead of building a third.
+Each phase's abstractions (`LLMProvider`, `EmbeddingProvider`, `VectorStoreProvider`, `Tool`, `CodeVectorStoreProvider`, `SandboxProvider`) mean later work rarely touches earlier code — e.g. tools were added without changing how RAG or memory work, Code was added without changing how document RAG or fine-tuning work, Vision needed no `LLMProvider` signature change at all (just a richer message-dict shape it already passed through unmodified), Image reused Vision's `images` table/endpoint outright instead of building a second image-storage mechanism, Image Edit reused both Image's `imagegen/` subprocess convention and the same `images` table outright instead of building a third, and Vector extended the existing tool-calling fenced-block convention into a validated structured-output pattern instead of inventing a new one.
 
 ## License
 

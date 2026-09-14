@@ -83,6 +83,15 @@ class Settings(BaseSettings):
     image_edit_max_outpaint_padding: int = 256
     image_edit_bg_removal_model: str = "u2net"
 
+    # --- Vector graphics ---
+    # No dedicated model setting: generation is plain JSON-producing text generation, not a
+    # specialized capability like vision/code, so it reuses settings.ollama_model directly
+    # rather than pulling a third model at startup.
+    vector_max_objects_per_document: int = 50
+    vector_max_retries: int = 1  # JSON-repair retry count on invalid scene/operation output
+    vector_canvas_max_width: int = 2000
+    vector_canvas_max_height: int = 2000
+
     # --- Sandbox (code execution, ADMIN-only) ---
     # This runs submitted code as a plain OS subprocess, not a container — no filesystem
     # jail, no network isolation, no memory/CPU cap beyond the timeout. See
