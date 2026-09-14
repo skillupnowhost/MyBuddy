@@ -99,6 +99,13 @@ class Settings(BaseSettings):
     video_gen_max_num_frames: int = 64
     video_gen_fps: int = 8
 
+    # --- StoryboardGenerator (video/CG/VFX spec §7) ---
+    # Pure LLM structured output, same fenced-block + Pydantic-validation + repair-retry
+    # convention as Vector's generate_scene — no image/video model involved, so this reuses
+    # settings.ollama_model directly rather than a dedicated capability.
+    storyboard_max_shots: int = 30
+    storyboard_max_retries: int = 1
+
     # --- Vector graphics ---
     # No dedicated model setting: generation is plain JSON-producing text generation, not a
     # specialized capability like vision/code, so it reuses settings.ollama_model directly

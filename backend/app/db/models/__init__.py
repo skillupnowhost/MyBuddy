@@ -32,6 +32,8 @@ from app.db.models.workspace import Workspace
 from app.db.models.agent_step import AgentStep
 from app.db.models.video import Video
 from app.db.models.video_generation_job import VideoGenerationJob
+from app.db.models.storyboard import Storyboard
+from app.db.models.storyboard_shot import StoryboardShot
 
 __all__ = [
     "User",
@@ -68,4 +70,6 @@ __all__ = [
     "AgentStep",
     "Video",
     "VideoGenerationJob",
+    "Storyboard",
+    "StoryboardShot",
 ]
