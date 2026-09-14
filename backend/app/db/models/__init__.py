@@ -17,6 +17,8 @@ from app.db.models.image_generation_job import ImageGenerationJob
 from app.db.models.image_edit_job import ImageEditJob
 from app.db.models.vector_document import VectorDocument
 from app.db.models.vector_object import VectorObject
+from app.db.models.animation_document import AnimationDocument
+from app.db.models.animation_keyframe import AnimationKeyframe
 
 __all__ = [
     "User",
@@ -38,4 +40,6 @@ __all__ = [
     "ImageEditJob",
     "VectorDocument",
     "VectorObject",
+    "AnimationDocument",
+    "AnimationKeyframe",
 ]

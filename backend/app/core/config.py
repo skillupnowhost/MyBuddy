@@ -101,6 +101,12 @@ class Settings(BaseSettings):
         "ICON": {"canvas_width": 64, "canvas_height": 64, "max_objects": 8},
     }
 
+    # --- Animation ---
+    animation_max_duration_ms: int = 10000
+    animation_max_keyframes: int = 200
+    animation_default_frame_rate: int = 30
+    animation_default_duration_ms: int = 2000
+
     # --- Sandbox (code execution, ADMIN-only) ---
     # This runs submitted code as a plain OS subprocess, not a container — no filesystem
     # jail, no network isolation, no memory/CPU cap beyond the timeout. See

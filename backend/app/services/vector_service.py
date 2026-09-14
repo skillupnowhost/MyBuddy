@@ -245,28 +245,7 @@ def apply_operation(db: Session, document: VectorDocument, op: VectorOperation) 
         return obj
 
     if isinstance(op, SetPropOp):
-        allowed = _ALLOWED_PROPS_BY_TYPE.get(obj.object_type, set())
-        if op.prop not in allowed:
-            raise ValueError(f"'{op.prop}' is not a valid property for a {obj.object_type}.")
-
-        value: float | str
-        if op.prop in ("fill", "stroke"):
-            value = _validate_color(str(op.value))
-        elif op.prop == "opacity":
-            value = float(op.value)
-            if not 0.0 <= value <= 1.0:
-                raise ValueError("opacity must be between 0 and 1.")
-        elif op.prop == "d":
-            value = str(op.value)
-            if not _PATH_DATA_RE.match(value):
-                raise ValueError("Path data contains characters outside the allowed path-command set.")
-        elif op.prop == "content":
-            value = str(op.value)
-        elif op.prop == "points":
-            raise ValueError("Editing 'points' via SET_PROP is not supported; delete and re-add the object.")
-        else:
-            value = float(op.value)
-
+        value = validate_prop_value(obj.object_type, op.prop, op.value)
         new_props = dict(obj.props)
         new_props[op.prop] = value
         obj.props = new_props  # reassigned (not mutated in place) so SQLAlchemy detects the change
@@ -275,6 +254,34 @@ def apply_operation(db: Session, document: VectorDocument, op: VectorOperation) 
         return obj
 
     raise AssertionError("unreachable")
+
+
+def validate_prop_value(object_type: str, prop: str, value: float | str) -> float | str:
+    """The actual boundary for any prop mutation, generation-time or manual: is `prop` even
+    valid for this object type, and is `value` an acceptable value for it. Shared by
+    apply_operation's SET_PROP handling and animation_service's keyframe validation — one
+    validation boundary, not two."""
+    allowed = _ALLOWED_PROPS_BY_TYPE.get(object_type, set())
+    if prop not in allowed:
+        raise ValueError(f"'{prop}' is not a valid property for a {object_type}.")
+
+    if prop in ("fill", "stroke"):
+        return _validate_color(str(value))
+    if prop == "opacity":
+        result = float(value)
+        if not 0.0 <= result <= 1.0:
+            raise ValueError("opacity must be between 0 and 1.")
+        return result
+    if prop == "d":
+        result_str = str(value)
+        if not _PATH_DATA_RE.match(result_str):
+            raise ValueError("Path data contains characters outside the allowed path-command set.")
+        return result_str
+    if prop == "content":
+        return str(value)
+    if prop == "points":
+        raise ValueError("Editing 'points' via SET_PROP is not supported; delete and re-add the object.")
+    return float(value)
 
 
 def _style_attrs(props: dict) -> str:
@@ -286,26 +293,32 @@ def _style_attrs(props: dict) -> str:
     )
 
 
-def _render_object(obj: VectorObject) -> str:
+def _render_object(obj: VectorObject, element_id: str | None = None, extra_attrs: str = "") -> str:
     p = obj.props
     style = _style_attrs(p)
+    # element_id/extra_attrs are only ever caller-constructed (e.g. f"obj-{uuid}", a CSS
+    # animation shorthand built from already-validated fields), never user/LLM text — but
+    # escaped anyway since they become attribute values like everything else here. Both are
+    # empty by default, so Vector's own render_svg output is byte-identical to before.
+    id_attr = f'id="{saxutils.escape(element_id)}" ' if element_id else ""
+    extra = f" {extra_attrs}" if extra_attrs else ""
     t = obj.object_type
     if t == "RECT":
-        return f'<rect x="{p["x"]}" y="{p["y"]}" width="{p["width"]}" height="{p["height"]}" rx="{p.get("rx", 0)}" {style}/>'
+        return f'<rect {id_attr}x="{p["x"]}" y="{p["y"]}" width="{p["width"]}" height="{p["height"]}" rx="{p.get("rx", 0)}" {style}{extra}/>'
     if t == "CIRCLE":
-        return f'<circle cx="{p["cx"]}" cy="{p["cy"]}" r="{p["r"]}" {style}/>'
+        return f'<circle {id_attr}cx="{p["cx"]}" cy="{p["cy"]}" r="{p["r"]}" {style}{extra}/>'
     if t == "ELLIPSE":
-        return f'<ellipse cx="{p["cx"]}" cy="{p["cy"]}" rx="{p["rx"]}" ry="{p["ry"]}" {style}/>'
+        return f'<ellipse {id_attr}cx="{p["cx"]}" cy="{p["cy"]}" rx="{p["rx"]}" ry="{p["ry"]}" {style}{extra}/>'
     if t == "LINE":
-        return f'<line x1="{p["x1"]}" y1="{p["y1"]}" x2="{p["x2"]}" y2="{p["y2"]}" {style}/>'
+        return f'<line {id_attr}x1="{p["x1"]}" y1="{p["y1"]}" x2="{p["x2"]}" y2="{p["y2"]}" {style}{extra}/>'
     if t == "POLYGON":
         points_str = " ".join(f"{x},{y}" for x, y in p["points"])
-        return f'<polygon points="{points_str}" {style}/>'
+        return f'<polygon {id_attr}points="{points_str}" {style}{extra}/>'
     if t == "PATH":
-        return f'<path d="{p["d"]}" {style}/>'
+        return f'<path {id_attr}d="{p["d"]}" {style}{extra}/>'
     if t == "TEXT":
         return (
-            f'<text x="{p["x"]}" y="{p["y"]}" font-size="{p.get("font_size", 16)}" {style}>'
+            f'<text {id_attr}x="{p["x"]}" y="{p["y"]}" font-size="{p.get("font_size", 16)}" {style}{extra}>'
             f'{saxutils.escape(str(p["content"]))}</text>'
         )
     raise ValueError(f"Unknown object_type: {t}")  # pragma: no cover - object_type is validated at write time

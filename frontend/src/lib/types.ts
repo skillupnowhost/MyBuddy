@@ -225,6 +225,30 @@ export interface VectorDocumentItem {
   updated_at: string;
 }
 
+export type AnimationEasing = "LINEAR" | "EASE_IN" | "EASE_OUT" | "EASE_IN_OUT";
+
+export interface AnimationKeyframeItem {
+  id: string;
+  object_id: string;
+  time_ms: number;
+  prop: string;
+  value: number | string;
+  easing: AnimationEasing;
+  created_at: string;
+}
+
+export interface AnimationDocumentItem {
+  id: string;
+  vector_document_id: string;
+  title: string;
+  frame_rate: number;
+  duration_ms: number;
+  loop: boolean;
+  keyframes: AnimationKeyframeItem[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SystemHealth {
   cpu_percent: number;
   ram_used_gb: number;

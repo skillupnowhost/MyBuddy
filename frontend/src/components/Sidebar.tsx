@@ -68,6 +68,12 @@ export default function Sidebar({
           ✒️ Vector
         </Link>
         <Link
+          href="/animation"
+          className="block w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
+        >
+          🎞️ Animator
+        </Link>
+        <Link
           href="/image-edit"
           className="block w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
         >

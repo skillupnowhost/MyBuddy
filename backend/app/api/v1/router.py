@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     admin,
+    animation,
     auth,
     chat,
     code,
@@ -30,3 +31,4 @@ api_router.include_router(images.router)
 api_router.include_router(image_generation.router)
 api_router.include_router(image_edit.router)
 api_router.include_router(vector.router)
+api_router.include_router(animation.router)
