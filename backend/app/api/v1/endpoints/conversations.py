@@ -6,7 +6,10 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_current_user, get_db
 from app.db.models.code_project import CodeProject
 from app.db.models.conversation import Conversation
+from app.db.models.max_mode_candidate import MaxModeCandidate
+from app.db.models.message import Message
 from app.db.models.user import User
+from app.schemas.arena import MaxModeCandidateRead
 from app.schemas.conversation import ConversationCreate, ConversationDetail, ConversationRead, ConversationUpdate
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
@@ -57,6 +60,7 @@ def create_conversation(
         model=payload.model,
         rag_enabled=payload.rag_enabled,
         tools_enabled=payload.tools_enabled,
+        max_mode_enabled=payload.max_mode_enabled,
         code_project_id=payload.code_project_id,
     )
     db.add(conversation)
@@ -90,6 +94,28 @@ def update_conversation(
     db.commit()
     db.refresh(conversation)
     return conversation
+
+
+@router.get("/{conversation_id}/messages/{message_id}/max-candidates", response_model=list[MaxModeCandidateRead])
+def get_max_mode_candidates_for_message(
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Transparency view for a MAX-mode turn: every candidate model's raw answer plus the
+    judge's synthesis (see chat_service._max_mode_reply / MaxModeCandidate). Empty list for a
+    normal (non-MAX-mode) message, not an error."""
+    _get_owned_conversation(db, conversation_id, user)
+    message = db.get(Message, message_id)
+    if message is None or message.conversation_id != conversation_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
+    return (
+        db.query(MaxModeCandidate)
+        .filter(MaxModeCandidate.message_id == message_id)
+        .order_by(MaxModeCandidate.is_judge.asc(), MaxModeCandidate.created_at.asc())
+        .all()
+    )
 
 
 @router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)

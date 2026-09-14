@@ -20,6 +20,12 @@ class Conversation(Base):
     model: Mapped[str | None] = mapped_column(String(255), nullable=True)
     rag_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     tools_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    # MAX mode (phase 9 sub-phase 3): fan a turn out to every PRODUCTION/CANARY model for the
+    # conversation's capability, then synthesize one judged reply — see
+    # chat_service._max_mode_reply. A no-op (falls back to the normal single-model path) when
+    # fewer than 2 candidates are registered, same honest scope cut as FAST/BEST/etc. in
+    # model_router.py.
+    max_mode_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     # When set, chat_service retrieves from this code project instead of the general
     # document RAG store — mutually exclusive with rag_enabled for v1.
     code_project_id: Mapped[uuid.UUID | None] = mapped_column(

@@ -25,6 +25,8 @@ from app.db.models.motion_clip import MotionClip
 from app.db.models.brand_kit import BrandKit
 from app.db.models.creative_project import CreativeProject
 from app.db.models.creative_asset import CreativeAsset
+from app.db.models.max_mode_candidate import MaxModeCandidate
+from app.db.models.arena_comparison_result import ArenaComparisonResult
 
 __all__ = [
     "User",
@@ -54,4 +56,6 @@ __all__ = [
     "BrandKit",
     "CreativeProject",
     "CreativeAsset",
+    "MaxModeCandidate",
+    "ArenaComparisonResult",
 ]

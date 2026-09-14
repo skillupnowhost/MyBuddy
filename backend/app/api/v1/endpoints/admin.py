@@ -15,7 +15,9 @@ from app.db.models.model_registry import RegisteredModel
 from app.db.models.training_job import TrainingJob
 from app.db.models.user import User
 from app.schemas.admin import AdminStats, AdminUserRead, RoleUpdate, SystemHealth
+from app.schemas.arena import ArenaComparisonResultRead, ArenaCompareRequest
 from app.schemas.training import BenchmarkRunResult, ModelBenchmarkResultRead, RegisteredModelRead
+from app.services.arena_service import list_arena_history, run_arena_comparison
 from app.services.benchmark_service import run_benchmark
 from app.services.llm_client import get_llm_client
 from app.services.model_registry_service import discover_local_models
@@ -104,6 +106,23 @@ def list_benchmark_results(
         .order_by(ModelBenchmarkResult.created_at.desc())
         .all()
     )
+
+
+@router.post("/arena/compare", response_model=list[ArenaComparisonResultRead])
+async def compare_models(
+    payload: ArenaCompareRequest, db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)
+):
+    """Runs one ad-hoc prompt against every PRODUCTION/CANARY/EXPERIMENTAL model registered
+    for the given capability (see arena_service.py) and persists the comparison. Returns an
+    empty list, not an error, if nothing is registered for that capability yet."""
+    return await run_arena_comparison(db, get_llm_client(), payload.capability, payload.prompt, payload.reference_answer)
+
+
+@router.get("/arena/history", response_model=list[ArenaComparisonResultRead])
+def get_arena_history(
+    capability: str | None = None, db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)
+):
+    return list_arena_history(db, capability)
 
 
 @router.get("/health", response_model=SystemHealth)
