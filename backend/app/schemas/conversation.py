@@ -15,6 +15,7 @@ class ConversationCreate(BaseModel):
     max_mode_enabled: bool = False
     expert_pipeline_enabled: bool = False
     code_project_id: uuid.UUID | None = None
+    workspace_id: uuid.UUID | None = None
 
 
 class ConversationUpdate(BaseModel):
@@ -26,6 +27,7 @@ class ConversationUpdate(BaseModel):
     max_mode_enabled: bool | None = None
     expert_pipeline_enabled: bool | None = None
     code_project_id: uuid.UUID | None = None
+    workspace_id: uuid.UUID | None = None
 
 
 class ConversationRead(BaseModel):
@@ -40,6 +42,7 @@ class ConversationRead(BaseModel):
     max_mode_enabled: bool
     expert_pipeline_enabled: bool
     code_project_id: uuid.UUID | None
+    workspace_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
 

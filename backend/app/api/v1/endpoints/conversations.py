@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.api.v1.endpoints.workspaces import get_owned_workspace
 from app.core.deps import get_current_user, get_db
 from app.db.models.code_project import CodeProject
 from app.db.models.conversation import Conversation
@@ -33,6 +34,12 @@ def _validate_code_project(db: Session, code_project_id: uuid.UUID | None, user:
     project = db.get(CodeProject, code_project_id)
     if project is None or project.user_id != user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Code project not found")
+
+
+def _validate_workspace(db: Session, workspace_id: uuid.UUID | None, user: User) -> None:
+    if workspace_id is None:
+        return
+    get_owned_workspace(db, workspace_id, user)  # raises 404 if missing/not owned
 
 
 def _validate_reply_mode_exclusivity(max_mode_enabled: bool, expert_pipeline_enabled: bool) -> None:
@@ -66,6 +73,7 @@ def create_conversation(
     user: User = Depends(get_current_user),
 ):
     _validate_code_project(db, payload.code_project_id, user)
+    _validate_workspace(db, payload.workspace_id, user)
     _validate_reply_mode_exclusivity(payload.max_mode_enabled, payload.expert_pipeline_enabled)
     conversation = Conversation(
         user_id=user.id,
@@ -77,6 +85,7 @@ def create_conversation(
         max_mode_enabled=payload.max_mode_enabled,
         expert_pipeline_enabled=payload.expert_pipeline_enabled,
         code_project_id=payload.code_project_id,
+        workspace_id=payload.workspace_id,
     )
     db.add(conversation)
     db.commit()
@@ -104,6 +113,8 @@ def update_conversation(
     updates = payload.model_dump(exclude_unset=True)
     if "code_project_id" in updates:
         _validate_code_project(db, updates["code_project_id"], user)
+    if "workspace_id" in updates:
+        _validate_workspace(db, updates["workspace_id"], user)
     resulting_max_mode = updates.get("max_mode_enabled", conversation.max_mode_enabled)
     resulting_expert_pipeline = updates.get("expert_pipeline_enabled", conversation.expert_pipeline_enabled)
     _validate_reply_mode_exclusivity(resulting_max_mode, resulting_expert_pipeline)

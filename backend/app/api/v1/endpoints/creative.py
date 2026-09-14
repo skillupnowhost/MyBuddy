@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.api.v1.endpoints.workspaces import get_owned_workspace
 from app.core.config import get_settings
 from app.core.deps import get_current_user, get_db
 from app.db.models.animation_document import AnimationDocument
@@ -122,7 +123,11 @@ def create_creative_project(
 ):
     if payload.brand_kit_id is not None:
         _get_owned_brand_kit(db, payload.brand_kit_id, user)
-    project = CreativeProject(user_id=user.id, title=payload.title, brand_kit_id=payload.brand_kit_id)
+    if payload.workspace_id is not None:
+        get_owned_workspace(db, payload.workspace_id, user)
+    project = CreativeProject(
+        user_id=user.id, title=payload.title, brand_kit_id=payload.brand_kit_id, workspace_id=payload.workspace_id
+    )
     db.add(project)
     db.commit()
     db.refresh(project)
@@ -155,6 +160,8 @@ def update_creative_project(
     updates = payload.model_dump(exclude_unset=True)
     if "brand_kit_id" in updates and updates["brand_kit_id"] is not None:
         _get_owned_brand_kit(db, updates["brand_kit_id"], user)
+    if "workspace_id" in updates and updates["workspace_id"] is not None:
+        get_owned_workspace(db, updates["workspace_id"], user)
     for field, value in updates.items():
         setattr(project, field, value)
     db.commit()

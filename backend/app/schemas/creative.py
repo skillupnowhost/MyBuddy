@@ -73,11 +73,13 @@ class CreativeAssetRead(BaseModel):
 class CreativeProjectCreate(BaseModel):
     title: str
     brand_kit_id: uuid.UUID | None = None
+    workspace_id: uuid.UUID | None = None
 
 
 class CreativeProjectPatch(BaseModel):
     title: str | None = None
     brand_kit_id: uuid.UUID | None = None
+    workspace_id: uuid.UUID | None = None
 
 
 class CreativeProjectRead(BaseModel):
@@ -86,6 +88,7 @@ class CreativeProjectRead(BaseModel):
     id: uuid.UUID
     title: str
     brand_kit_id: uuid.UUID | None
+    workspace_id: uuid.UUID | None
     assets: list[CreativeAssetRead] = []
     created_at: datetime
     updated_at: datetime

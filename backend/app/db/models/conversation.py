@@ -38,6 +38,10 @@ class Conversation(Base):
     code_project_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID(), ForeignKey("code_projects.id", ondelete="SET NULL"), nullable=True
     )
+    # Project Workspaces (phase 9 sub-phase 5): optional grouping, see db/models/workspace.py.
+    workspace_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
