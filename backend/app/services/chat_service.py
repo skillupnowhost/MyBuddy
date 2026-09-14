@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 import uuid
 from collections.abc import AsyncGenerator, Callable
@@ -7,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.models.conversation import Conversation
+from app.db.models.image import Image
 from app.db.models.message import Message
 from app.db.models.usage_log import UsageLog
 from app.services.code_rag_service import build_code_rag_prompt, retrieve_code_context
@@ -60,6 +62,7 @@ async def stream_assistant_reply(
     embedding_provider: EmbeddingProvider,
     vector_store: VectorStoreProvider,
     code_vector_store: CodeVectorStoreProvider,
+    image_ids: list[uuid.UUID] | None = None,
 ) -> AsyncGenerator[str, None]:
     """Persists the user message, streams the real model reply as SSE, then persists it.
 
@@ -77,9 +80,19 @@ async def stream_assistant_reply(
         user_message = Message(conversation_id=conversation.id, role="user", content=user_content)
         db.add(user_message)
         db.commit()
+
+        attached_images: list[Image] = []
+        for image_id in image_ids or []:
+            image = db.get(Image, image_id)
+            if image is not None and image.user_id == conversation.user_id:
+                image.message_id = user_message.id
+                attached_images.append(image)
+        if attached_images:
+            db.commit()
+
         db.refresh(conversation)
 
-        model = conversation.model or settings.ollama_model
+        model = settings.ollama_vision_model if attached_images else (conversation.model or settings.ollama_model)
         memory_context = get_memory_context(db, conversation.user_id)
         history = _history_for_ollama(conversation, memory_context)
 
@@ -117,6 +130,15 @@ async def stream_assistant_reply(
                     {"filename": chunk.document.filename, "page_number": chunk.page_number} for chunk in chunks
                 ]
                 yield f"data: {json.dumps({'sources': sources})}\n\n"
+
+        if attached_images and history:
+            # A sibling key on the message dict, not a content rewrite — composes cleanly
+            # with the RAG branches above, which only ever replace `content`.
+            encoded = []
+            for image in attached_images:
+                with open(image.storage_path, "rb") as f:
+                    encoded.append(base64.b64encode(f.read()).decode("ascii"))
+            history[-1]["images"] = encoded
 
         usage_sink: dict = {}
         full_reply = ""

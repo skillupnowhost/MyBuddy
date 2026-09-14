@@ -20,3 +20,4 @@ class Message(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     conversation: Mapped["Conversation"] = relationship(back_populates="messages")
+    images: Mapped[list["Image"]] = relationship(back_populates="message")

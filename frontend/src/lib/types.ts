@@ -16,6 +16,13 @@ export interface Source {
   lines?: string | null;
 }
 
+export interface ImageItem {
+  id: string;
+  content_type: string;
+  size_bytes: number;
+  created_at: string;
+}
+
 export interface Message {
   id: string;
   role: "system" | "user" | "assistant";
@@ -23,6 +30,7 @@ export interface Message {
   created_at: string;
   sources?: Source[];
   toolCall?: string;
+  images?: ImageItem[];
 }
 
 export type DocumentStatus = "UPLOADING" | "PROCESSING" | "EMBEDDING" | "READY" | "FAILED";
@@ -153,6 +161,7 @@ export interface ModelsResponse {
   models: string[];
   default_model: string;
   code_model: string;
+  vision_model: string;
 }
 
 export interface SystemHealth {

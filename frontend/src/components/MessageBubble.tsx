@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import AuthedImage from "@/components/AuthedImage";
 import type { Message } from "@/lib/types";
 
 function CopyableCode({ children }: { children: string }) {
@@ -28,6 +29,13 @@ export default function MessageBubble({ message }: { message: Message }) {
           isUser ? "bg-blue-600 text-white" : "bg-[#1c202b] text-white/90"
         }`}
       >
+        {message.images && message.images.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {message.images.map((img) => (
+              <AuthedImage key={img.id} imageId={img.id} className="h-32 w-32 rounded-lg object-cover" />
+            ))}
+          </div>
+        )}
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{

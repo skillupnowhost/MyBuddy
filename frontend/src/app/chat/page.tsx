@@ -6,11 +6,13 @@ import Sidebar from "@/components/Sidebar";
 import MessageBubble from "@/components/MessageBubble";
 import DocumentsPanel from "@/components/DocumentsPanel";
 import MemoriesPanel from "@/components/MemoriesPanel";
+import AuthedImage from "@/components/AuthedImage";
 import { apiJson } from "@/lib/api";
 import { getCurrentUser } from "@/lib/admin";
 import { clearTokens, isLoggedIn } from "@/lib/auth";
+import { deleteImage, uploadImage } from "@/lib/images";
 import { streamChatMessage } from "@/lib/stream";
-import type { Conversation, Message } from "@/lib/types";
+import type { Conversation, ImageItem, Message } from "@/lib/types";
 
 export default function ChatPage() {
   const router = useRouter();
@@ -23,8 +25,11 @@ export default function ChatPage() {
   const [showDocuments, setShowDocuments] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [pendingImages, setPendingImages] = useState<ImageItem[]>([]);
+  const [imageUploading, setImageUploading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const activeConversation = conversations.find((c) => c.id === activeId) ?? null;
 
@@ -98,6 +103,31 @@ export default function ChatPage() {
     router.replace("/login");
   }
 
+  async function handleAttachImages(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    setError(null);
+    setImageUploading(true);
+    try {
+      const uploaded = await Promise.all(files.map(uploadImage));
+      setPendingImages((prev) => [...prev, ...uploaded]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Image upload failed.");
+    } finally {
+      setImageUploading(false);
+      if (imageInputRef.current) imageInputRef.current.value = "";
+    }
+  }
+
+  async function handleRemovePendingImage(id: string) {
+    setPendingImages((prev) => prev.filter((img) => img.id !== id));
+    try {
+      await deleteImage(id);
+    } catch {
+      // Already attached elsewhere or already gone — nothing more to do client-side.
+    }
+  }
+
   async function handleSend() {
     const content = input.trim();
     if (!content || isStreaming) return;
@@ -113,11 +143,19 @@ export default function ChatPage() {
       setActiveId(conversationId);
     }
 
+    const imagesForThisMessage = pendingImages;
     setInput("");
+    setPendingImages([]);
     setError(null);
     setMessages((prev) => [
       ...prev,
-      { id: `local-${Date.now()}`, role: "user", content, created_at: new Date().toISOString() },
+      {
+        id: `local-${Date.now()}`,
+        role: "user",
+        content,
+        created_at: new Date().toISOString(),
+        images: imagesForThisMessage,
+      },
       { id: "streaming", role: "assistant", content: "", created_at: new Date().toISOString() },
     ]);
 
@@ -141,6 +179,7 @@ export default function ChatPage() {
         (toolName) => {
           setMessages((prev) => prev.map((m) => (m.id === "streaming" ? { ...m, toolCall: toolName } : m)));
         },
+        imagesForThisMessage.map((img) => img.id),
       );
     } catch (err) {
       if (!(err instanceof DOMException && err.name === "AbortError")) {
@@ -218,7 +257,39 @@ export default function ChatPage() {
                 </label>
               </div>
             )}
+            {pendingImages.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {pendingImages.map((img) => (
+                  <div key={img.id} className="group relative">
+                    <AuthedImage imageId={img.id} className="h-16 w-16 rounded-lg object-cover" />
+                    <button
+                      onClick={() => handleRemovePendingImage(img.id)}
+                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/80 text-xs text-white/80 hover:bg-red-600"
+                      aria-label="Remove image"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex items-end gap-2">
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                multiple
+                onChange={handleAttachImages}
+                className="hidden"
+              />
+              <button
+                onClick={() => imageInputRef.current?.click()}
+                disabled={imageUploading}
+                title="Attach image(s) for MyBuddy Vision"
+                className="rounded-xl border border-white/10 px-3 py-3 text-sm text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-40"
+              >
+                🖼️
+              </button>
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}

@@ -9,10 +9,12 @@ class MockProvider(LLMProvider):
     def __init__(self, reply: str = "Hello there!", models: list[str] | None = None):
         self.reply = reply
         self.models = models or ["mock-model"]
+        self.last_model: str | None = None
 
     async def chat_stream(
         self, model: str, messages: list[dict], temperature: float = 0.7, usage_sink: dict | None = None
     ) -> AsyncGenerator[str, None]:
+        self.last_model = model
         chunk_size = 5
         for i in range(0, len(self.reply), chunk_size):
             yield self.reply[i : i + chunk_size]

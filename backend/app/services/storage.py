@@ -12,6 +12,13 @@ _SAFE_EXTENSIONS = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
 }
 
+_SAFE_IMAGE_EXTENSIONS = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
+
 
 def _save(user_id: str, subdir: str, extension: str, content: bytes) -> str:
     user_dir = os.path.join(settings.storage_dir, subdir, user_id)
@@ -32,6 +39,12 @@ def save_upload(user_id: str, content_type: str, content: bytes) -> str:
 def save_dataset(user_id: str, content: bytes) -> str:
     """Saves a training dataset upload (always .jsonl), same isolation rules as save_upload."""
     return _save(user_id, "datasets", ".jsonl", content)
+
+
+def save_image(user_id: str, content_type: str, content: bytes) -> str:
+    """Saves an uploaded image, same isolation rules as save_upload."""
+    extension = _SAFE_IMAGE_EXTENSIONS.get(content_type, "")
+    return _save(user_id, "images", extension, content)
 
 
 def delete_upload(storage_path: str) -> None:

@@ -4,10 +4,13 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from app.schemas.image import ImageRead
+
 
 class MessageCreate(BaseModel):
     content: str
     stream: bool = True
+    image_ids: list[uuid.UUID] = []
 
 
 class MessageRead(BaseModel):
@@ -16,4 +19,5 @@ class MessageRead(BaseModel):
     id: uuid.UUID
     role: Literal["system", "user", "assistant"]
     content: str
+    images: list[ImageRead] = []
     created_at: datetime

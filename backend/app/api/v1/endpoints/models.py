@@ -19,4 +19,5 @@ async def list_models(
         "models": await llm_client.list_models(),
         "default_model": settings.ollama_model,
         "code_model": settings.ollama_code_model,
+        "vision_model": settings.ollama_vision_model,
     }

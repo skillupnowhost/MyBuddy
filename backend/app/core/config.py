@@ -60,6 +60,11 @@ class Settings(BaseSettings):
         "node_modules", ".git", "__pycache__", ".venv", "venv", "dist", "build", ".next",
     )
 
+    # --- Vision (image/screenshot understanding) ---
+    ollama_vision_model: str = "moondream"
+    max_image_size_bytes: int = 10 * 1024 * 1024  # 10MB
+    allowed_image_content_types: tuple[str, ...] = ("image/png", "image/jpeg", "image/webp", "image/gif")
+
     # --- Sandbox (code execution, ADMIN-only) ---
     # This runs submitted code as a plain OS subprocess, not a container — no filesystem
     # jail, no network isolation, no memory/CPU cap beyond the timeout. See

@@ -2,7 +2,7 @@
 
 Your private, self-hosted AI companion. Open-source, no paid inference API required.
 
-This build covers **Phases 1-5 and 7** end to end: real local LLM chat, RAG, long-term memory, opt-in tool calling, fine-tuning infrastructure, an admin dashboard, and MyBuddy Code (code chat, code RAG over uploaded projects, an in-browser editor, and admin-only sandboxed execution). **Phase 6** (a from-scratch research model) has real, correct, syntax-verified code in `research/` that hasn't been executed on this particular dev machine — see that directory's README for why. See [Roadmap](#roadmap) for the phase-by-phase breakdown.
+This build covers **Phases 1-5, 7, and 8** end to end: real local LLM chat, RAG, long-term memory, opt-in tool calling, fine-tuning infrastructure, an admin dashboard, MyBuddy Code (code chat, code RAG over uploaded projects, an in-browser editor, and admin-only sandboxed execution), and MyBuddy Vision (attach images to any chat message for a vision-capable local model to answer about). **Phase 6** (a from-scratch research model) has real, correct, syntax-verified code in `research/` that hasn't been executed on this particular dev machine — see that directory's README for why. See [Roadmap](#roadmap) for the phase-by-phase breakdown.
 
 ## Architecture
 
@@ -174,6 +174,14 @@ The "Run" button executes code as a **plain OS subprocess, not a container** (`b
 - Only `python` is enabled by default (`SANDBOX_ALLOWED_LANGUAGES`). Set `SANDBOX_ENABLED=false` to disable the subsystem entirely.
 - The `SandboxProvider` abstraction (`backend/app/services/sandbox_provider.py`) exists so a real container/VM-backed implementation (e.g. a future `DockerSandboxProvider`) can replace `SubprocessSandboxProvider` later with zero changes to any call site — same pattern as every other provider abstraction in this codebase. Do not expose this feature to non-admin users before that replacement exists.
 
+## MyBuddy Vision (Phase 8)
+
+Attach one or more images (PNG/JPEG/WEBP/GIF, 10MB limit by default) to any chat message via the 🖼️ button — no separate "vision conversation" needed. Uploading returns an image id (`POST /api/v1/images`); it's attached to the message at send time and, from then on, served back only through an authenticated `GET /api/v1/images/{id}` (never a public/static path — the frontend fetches it with its bearer token and renders it via a `blob:` URL, since a plain `<img src>` can't carry an Authorization header).
+
+**No `LLMProvider` change was needed.** Ollama's `/api/chat` already accepts a base64 `images` array as a sibling of `content` inside a message dict, and `OllamaProvider.chat_stream` already forwards whatever `messages: list[dict]` shape it's given verbatim — so a turn with an image just gets an extra `"images"` key attached to its message dict in `chat_service.py`, composing cleanly with the RAG code paths that already rewrite that same dict.
+
+Any turn that includes an image automatically uses `OLLAMA_VISION_MODEL` (default `moondream`, a small ~1.8B model consistent with this repo's low-RAM-first choices) instead of the conversation's normal model — a text-only turn in the same conversation is unaffected. For a machine with more RAM or a GPU, point `OLLAMA_VISION_MODEL` at `llava` or `llama3.2-vision` instead for stronger image understanding.
+
 ## Research track (Phase 6)
 
 `research/` contains a from-scratch, from-random-initialization transformer (RoPE, causal attention, RMSNorm, SwiGLU) and a training loop — real, correct code, syntax-verified, but not executed live here (same hardware reasoning as fine-tuning, see `research/README.md`). This is a separate, educational scaffold from both the main app and the fine-tuning pipeline.
@@ -189,6 +197,7 @@ The "Run" button executes code as a **plain OS subprocess, not a container** (`b
 - The calculator tool uses an AST-based restricted evaluator, never Python's `eval()` — arbitrary code execution is not reachable through it.
 - Code execution (`/code`'s "Run" button) IS arbitrary code execution, deliberately, and is gated to `ADMIN` accounts only — see "Sandbox execution" under MyBuddy Code above for exactly what its subprocess-based isolation does and does not protect against.
 - Uploaded code project zips are extracted with path-traversal and zip-bomb guards (entry-count cap, per-file size cap, compression-ratio cap, total-extracted-size cap) — destination paths are always rebuilt from sanitized segments, never from the raw archive entry name.
+- Uploaded images are served back only through an authenticated `GET /api/v1/images/{id}` (ownership-checked, 404 on cross-user access), never a public/static path.
 - Secrets live in `.env`, never in code. `.env` is gitignored.
 
 ## Roadmap
@@ -202,8 +211,9 @@ The "Run" button executes code as a **plain OS subprocess, not a container** (`b
 | 5 | Tools, usage logging, admin dashboard, system health | Done, verified live |
 | 6 | Experimental custom-trained MyBuddy model (research track) | Code complete, syntax-verified, not executed on this machine |
 | 7 | MyBuddy Code — code chat, code RAG (zip projects), CodeMirror editor, admin-only subprocess sandbox execution | Done, verified live |
+| 8 | MyBuddy Vision — attach images to chat, auto vision-model switch per turn | Done, verified via test suite (see note below) |
 
-Each phase's abstractions (`LLMProvider`, `EmbeddingProvider`, `VectorStoreProvider`, `Tool`, `CodeVectorStoreProvider`, `SandboxProvider`) mean later work rarely touches earlier code — e.g. tools were added without changing how RAG or memory work, and Code was added without changing how document RAG or fine-tuning work.
+Each phase's abstractions (`LLMProvider`, `EmbeddingProvider`, `VectorStoreProvider`, `Tool`, `CodeVectorStoreProvider`, `SandboxProvider`) mean later work rarely touches earlier code — e.g. tools were added without changing how RAG or memory work, Code was added without changing how document RAG or fine-tuning work, and Vision needed no `LLMProvider` signature change at all — just a richer message-dict shape it already passed through unmodified.
 
 ## License
 

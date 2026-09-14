@@ -8,10 +8,11 @@ export async function streamChatMessage(
   signal?: AbortSignal,
   onSources?: (sources: Source[]) => void,
   onToolCall?: (toolName: string) => void,
+  imageIds?: string[],
 ): Promise<void> {
   const resp = await apiFetch(`/api/v1/conversations/${conversationId}/messages`, {
     method: "POST",
-    body: JSON.stringify({ content, stream: true }),
+    body: JSON.stringify({ content, stream: true, image_ids: imageIds ?? [] }),
     signal,
   });
 

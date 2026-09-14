@@ -28,6 +28,8 @@ async def lifespan(app: FastAPI):
     startup_models = [settings.ollama_model, settings.ollama_embedding_model]
     if settings.ollama_code_model and settings.ollama_code_model != settings.ollama_model:
         startup_models.append(settings.ollama_code_model)
+    if settings.ollama_vision_model and settings.ollama_vision_model not in startup_models:
+        startup_models.append(settings.ollama_vision_model)
     for model in startup_models:
         try:
             await llm_client.ensure_model(model)
