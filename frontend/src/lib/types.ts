@@ -102,6 +102,21 @@ export interface RegisteredModelItem {
   created_at: string;
 }
 
+export interface ModelBenchmarkResultItem {
+  id: string;
+  prompt_id: string;
+  capability: string;
+  score: number;
+  latency_ms: number;
+  response_preview: string;
+  created_at: string;
+}
+
+export interface BenchmarkRunResultItem {
+  results: ModelBenchmarkResultItem[];
+  eval_score: number | null;
+}
+
 export interface AdminUserItem {
   id: string;
   email: string;

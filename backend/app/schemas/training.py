@@ -63,3 +63,20 @@ class RegisteredModelRead(BaseModel):
 
 class ModelPromotion(BaseModel):
     status: ModelStatus
+
+
+class ModelBenchmarkResultRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    prompt_id: str
+    capability: str
+    score: float
+    latency_ms: int
+    response_preview: str
+    created_at: datetime
+
+
+class BenchmarkRunResult(BaseModel):
+    results: list[ModelBenchmarkResultRead]
+    eval_score: float | None

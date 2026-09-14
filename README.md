@@ -276,6 +276,31 @@ whether `training_job_id` is set.
   image still forces the VISION-capability model regardless of any pin, since a pinned
   non-vision model can't process images (same override the vision phase already relied on).
 
+## Model Benchmark & Arena (Phase 16)
+
+Second sub-phase of the unified model router. `RegisteredModel.eval_score` existed since
+Phase 15 and the router already ranks candidates by it, but nothing populated it for a
+freshly-discovered base model — discovery left `eval_score = NULL`, so ranking never
+actually differentiated between two same-capability candidates. This phase closes that gap.
+
+- **`POST /admin/models/{id}/benchmark`** (admin-only) runs a small, fixed, in-code prompt
+  suite (`backend/app/services/benchmark_service.py`) against that model's real base model
+  through the LLM client, scores each reply (word-overlap F1 against a reference answer, or
+  keyword-presence where an exact reference doesn't make sense), and writes the average to
+  `eval_score`. Results are also kept per-prompt in `model_benchmark_results` for the arena
+  view in `/finetune`'s registry section (a "Benchmark" button per row, admin-only).
+- **Never executes generated code to score it** — CODE-capability prompts are scored by
+  keyword/structure presence in the text reply, not by running anything. Only the
+  admin-gated sandbox (see MyBuddy Code) is allowed to actually execute code.
+- **TEXT and CODE have a defined suite; VISION and EMBEDDING don't yet** — an honest scope
+  cut, not a silent gap: `run_benchmark` returns an empty result list for those capabilities
+  rather than fabricating a score.
+- **Verified live, not just SQLite-mocked**: ran the real `benchmark_service.run_benchmark`
+  against the actually-running local Ollama `llama3.2:1b` — it correctly scored a wrong
+  arithmetic answer ("12 plus 30" → the model replied "132") as 0.0 while scoring three
+  correct replies 1.0, landing on a real `eval_score` of 0.75. This is a genuine quality
+  signal, not a placeholder.
+
 ## Research track (Phase 6)
 
 `research/` contains a from-scratch, from-random-initialization transformer (RoPE, causal attention, RMSNorm, SwiGLU) and a training loop — real, correct code, syntax-verified, but not executed live here (same hardware reasoning as fine-tuning, see `research/README.md`). This is a separate, educational scaffold from both the main app and the fine-tuning pipeline.
@@ -314,6 +339,7 @@ whether `training_job_id` is set.
 | 13 | MyBuddy Motion — composes multiple Animator animations into one sequence | Done, verified via test suite |
 | 14 | MyBuddy Creative Director — brand kits + cross-asset projects orchestrating Vector/Animator/Motion (completes the Creative Platform expansion) | Done, verified via test suite |
 | 15 | Model registry & router — local-model discovery, capability-based routing (first sub-phase of the unified model router; roadmap phase 8, Astro, explicitly skipped pending a C compiler) | Done, verified via test suite + live discovery against a running Ollama instance |
+| 16 | Model Benchmark & Arena — fixed prompt suite scores registered models and feeds the router's ranking (second sub-phase of the unified model router) | Done, verified via test suite + a real live benchmark run against Ollama |
 
 Each phase's abstractions (`LLMProvider`, `EmbeddingProvider`, `VectorStoreProvider`, `Tool`, `CodeVectorStoreProvider`, `SandboxProvider`) mean later work rarely touches earlier code — e.g. tools were added without changing how RAG or memory work, Code was added without changing how document RAG or fine-tuning work, Vision needed no `LLMProvider` signature change at all (just a richer message-dict shape it already passed through unmodified), Image reused Vision's `images` table/endpoint outright instead of building a second image-storage mechanism, Image Edit reused both Image's `imagegen/` subprocess convention and the same `images` table outright instead of building a third, Vector extended the existing tool-calling fenced-block convention into a validated structured-output pattern instead of inventing a new one, Animator reused Vector's generation mechanism, prop validation, and SVG renderer outright rather than building a parallel animation stack, Motion reused Animator's renderer and easing/prop tables outright for a pure compositing/timing layer with no generation step of its own, and Creative Director reused Vector's generation function outright (extracted into a shared service function) instead of inventing a second orchestration protocol.
 

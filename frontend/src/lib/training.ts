@@ -1,5 +1,5 @@
 import { apiFetch, apiJson } from "./api";
-import type { DatasetItem, RegisteredModelItem, TrainingJobItem } from "./types";
+import type { BenchmarkRunResultItem, DatasetItem, ModelBenchmarkResultItem, RegisteredModelItem, TrainingJobItem } from "./types";
 
 export function listDatasets(): Promise<DatasetItem[]> {
   return apiJson<DatasetItem[]>("/api/v1/datasets");
@@ -49,4 +49,12 @@ export function promoteModel(id: string, status: string): Promise<RegisteredMode
 
 export function discoverModels(): Promise<RegisteredModelItem[]> {
   return apiJson<RegisteredModelItem[]>("/api/v1/admin/models/discover", { method: "POST" });
+}
+
+export function runBenchmark(id: string): Promise<BenchmarkRunResultItem> {
+  return apiJson<BenchmarkRunResultItem>(`/api/v1/admin/models/${id}/benchmark`, { method: "POST" });
+}
+
+export function getBenchmarkResults(id: string): Promise<ModelBenchmarkResultItem[]> {
+  return apiJson<ModelBenchmarkResultItem[]>(`/api/v1/admin/models/${id}/benchmark`);
 }

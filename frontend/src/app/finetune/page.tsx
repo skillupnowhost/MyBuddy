@@ -14,9 +14,10 @@ import {
   listRegisteredModels,
   listTrainingJobs,
   promoteModel,
+  runBenchmark,
   uploadDataset,
 } from "@/lib/training";
-import type { DatasetItem, ModelStatus, RegisteredModelItem, TrainingJobItem } from "@/lib/types";
+import type { DatasetItem, ModelBenchmarkResultItem, ModelStatus, RegisteredModelItem, TrainingJobItem } from "@/lib/types";
 
 const STATUS_COLORS: Record<string, string> = {
   UPLOADED: "text-white/50",
@@ -40,6 +41,8 @@ export default function FinetunePage() {
   const [baseModel, setBaseModel] = useState("meta-llama/Llama-3.2-1B");
   const [selectedDataset, setSelectedDataset] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [benchmarking, setBenchmarking] = useState<string | null>(null);
+  const [benchmarkResults, setBenchmarkResults] = useState<Record<string, ModelBenchmarkResultItem[]>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
@@ -108,6 +111,20 @@ export default function FinetunePage() {
       setModels((prev) => [...found, ...prev]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not discover local models.");
+    }
+  }
+
+  async function handleBenchmark(id: string) {
+    setError(null);
+    setBenchmarking(id);
+    try {
+      const run = await runBenchmark(id);
+      setBenchmarkResults((prev) => ({ ...prev, [id]: run.results }));
+      setModels((prev) => prev.map((m) => (m.id === id ? { ...m, eval_score: run.eval_score } : m)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not run benchmark.");
+    } finally {
+      setBenchmarking(null);
     }
   }
 
@@ -238,30 +255,64 @@ export default function FinetunePage() {
           </p>
           <div className="space-y-1">
             {models.map((model) => (
-              <div key={model.id} className="flex items-center justify-between rounded-lg px-2 py-2 text-sm hover:bg-white/5">
-                <div>
-                  <p className="text-white/90">
-                    {model.name} <span className="text-white/40">({model.base_model})</span>
-                  </p>
-                  <p className="text-xs text-white/40">
-                    <span className="rounded bg-white/10 px-1.5 py-0.5">{model.capability}</span>{" "}
-                    <span className="rounded bg-white/10 px-1.5 py-0.5">{model.provider}</span>{" "}
-                    {model.status}
-                    {model.eval_score !== null ? ` · eval: ${model.eval_score}` : ""}
-                  </p>
+              <div key={model.id} className="rounded-lg px-2 py-2 text-sm hover:bg-white/5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-white/90">
+                      {model.name} <span className="text-white/40">({model.base_model})</span>
+                    </p>
+                    <p className="text-xs text-white/40">
+                      <span className="rounded bg-white/10 px-1.5 py-0.5">{model.capability}</span>{" "}
+                      <span className="rounded bg-white/10 px-1.5 py-0.5">{model.provider}</span>{" "}
+                      {model.status}
+                      {model.eval_score !== null ? ` · eval: ${model.eval_score.toFixed(2)}` : " · not benchmarked"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleBenchmark(model.id)}
+                        disabled={benchmarking === model.id}
+                        className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white/70 hover:border-blue-500 hover:text-white disabled:opacity-40"
+                      >
+                        {benchmarking === model.id ? "Benchmarking…" : "Benchmark"}
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <select
+                        value={model.status}
+                        onChange={(e) => handlePromote(model.id, e.target.value as ModelStatus)}
+                        className="rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1 text-xs text-white"
+                      >
+                        {PROMOTION_OPTIONS.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
                 </div>
-                {isAdmin && (
-                  <select
-                    value={model.status}
-                    onChange={(e) => handlePromote(model.id, e.target.value as ModelStatus)}
-                    className="rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1 text-xs text-white"
-                  >
-                    {PROMOTION_OPTIONS.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
+                {benchmarkResults[model.id] && (
+                  <table className="mt-2 w-full text-xs text-white/60">
+                    <tbody>
+                      {benchmarkResults[model.id].length === 0 ? (
+                        <tr>
+                          <td className="py-1 text-white/40">
+                            No benchmark suite defined yet for {model.capability} models.
+                          </td>
+                        </tr>
+                      ) : (
+                        benchmarkResults[model.id].map((r) => (
+                          <tr key={r.id} className="border-t border-white/5">
+                            <td className="py-1 pr-3">{r.prompt_id}</td>
+                            <td className="py-1 pr-3">{r.score.toFixed(2)}</td>
+                            <td className="py-1 text-white/40">{r.latency_ms}ms</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 )}
               </div>
             ))}

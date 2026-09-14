@@ -10,10 +10,13 @@ from app.db.models.conversation import Conversation
 from app.db.models.document import Document
 from app.db.models.memory import Memory
 from app.db.models.message import Message
+from app.db.models.model_benchmark_result import ModelBenchmarkResult
+from app.db.models.model_registry import RegisteredModel
 from app.db.models.training_job import TrainingJob
 from app.db.models.user import User
 from app.schemas.admin import AdminStats, AdminUserRead, RoleUpdate, SystemHealth
-from app.schemas.training import RegisteredModelRead
+from app.schemas.training import BenchmarkRunResult, ModelBenchmarkResultRead, RegisteredModelRead
+from app.services.benchmark_service import run_benchmark
 from app.services.llm_client import get_llm_client
 from app.services.model_registry_service import discover_local_models
 
@@ -68,6 +71,39 @@ async def discover_models(db: Session = Depends(get_db), _admin: User = Depends(
     discovery alone never makes a model selectable by the router — it still needs an explicit
     promotion to PRODUCTION via PATCH /models/registry/{id}/promote."""
     return await discover_local_models(db, get_llm_client())
+
+
+def _get_registered_model(db: Session, model_id: uuid.UUID) -> RegisteredModel:
+    model = db.get(RegisteredModel, model_id)
+    if model is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
+    return model
+
+
+@router.post("/models/{model_id}/benchmark", response_model=BenchmarkRunResult)
+async def benchmark_model(
+    model_id: uuid.UUID, db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)
+):
+    """Runs the fixed benchmark suite for this model's capability (see benchmark_service.py)
+    and writes the average score to eval_score — what FrontierModelRouter actually ranks
+    candidates by. Capabilities without a defined suite yet (VISION, EMBEDDING) return an
+    empty result list rather than a fabricated score."""
+    model = _get_registered_model(db, model_id)
+    results = await run_benchmark(db, get_llm_client(), model)
+    return BenchmarkRunResult(results=results, eval_score=model.eval_score)
+
+
+@router.get("/models/{model_id}/benchmark", response_model=list[ModelBenchmarkResultRead])
+def list_benchmark_results(
+    model_id: uuid.UUID, db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)
+):
+    _get_registered_model(db, model_id)
+    return (
+        db.query(ModelBenchmarkResult)
+        .filter(ModelBenchmarkResult.model_id == model_id)
+        .order_by(ModelBenchmarkResult.created_at.desc())
+        .all()
+    )
 
 
 @router.get("/health", response_model=SystemHealth)
