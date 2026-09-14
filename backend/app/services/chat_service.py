@@ -1,0 +1,80 @@
+import json
+import uuid
+from collections.abc import AsyncGenerator, Callable
+
+from sqlalchemy.orm import Session
+
+from app.core.config import get_settings
+from app.db.models.conversation import Conversation
+from app.db.models.message import Message
+from app.services.embedding_provider import EmbeddingProvider
+from app.services.llm_provider import LLMProvider
+from app.services.rag_service import build_rag_prompt, retrieve_context
+from app.services.vector_store import VectorStoreProvider
+
+settings = get_settings()
+
+
+def _history_for_ollama(conversation: Conversation) -> list[dict]:
+    history = []
+    if conversation.system_prompt:
+        history.append({"role": "system", "content": conversation.system_prompt})
+    for msg in conversation.messages:
+        history.append({"role": msg.role, "content": msg.content})
+    return history
+
+
+async def stream_assistant_reply(
+    conversation_id: uuid.UUID,
+    user_content: str,
+    llm_client: LLMProvider,
+    session_factory: Callable[[], Session],
+    embedding_provider: EmbeddingProvider,
+    vector_store: VectorStoreProvider,
+) -> AsyncGenerator[str, None]:
+    """Persists the user message, streams the real model reply as SSE, then persists it.
+
+    Opens its own DB session rather than reusing the request-scoped one: FastAPI tears down
+    `Depends(get_db)` as soon as the endpoint function returns, which happens before a
+    StreamingResponse's body iterator actually runs.
+    """
+    db = session_factory()
+    try:
+        conversation = db.get(Conversation, conversation_id)
+        if conversation is None:
+            yield f"data: {json.dumps({'error': 'Conversation not found'})}\n\n"
+            return
+
+        user_message = Message(conversation_id=conversation.id, role="user", content=user_content)
+        db.add(user_message)
+        db.commit()
+        db.refresh(conversation)
+
+        model = conversation.model or settings.ollama_model
+        history = _history_for_ollama(conversation)
+
+        if conversation.rag_enabled and history:
+            chunks = await retrieve_context(
+                db, conversation.user_id, user_content, embedding_provider, vector_store, settings.rag_top_k
+            )
+            if chunks:
+                history[-1] = {"role": "user", "content": build_rag_prompt(user_content, chunks)}
+                sources = [
+                    {"filename": chunk.document.filename, "page_number": chunk.page_number} for chunk in chunks
+                ]
+                yield f"data: {json.dumps({'sources': sources})}\n\n"
+
+        full_reply = ""
+        try:
+            async for delta in llm_client.chat_stream(model, history):
+                full_reply += delta
+                yield f"data: {json.dumps({'delta': delta})}\n\n"
+        finally:
+            if full_reply:
+                assistant_message = Message(conversation_id=conversation.id, role="assistant", content=full_reply)
+                db.add(assistant_message)
+                db.commit()
+
+        yield f"data: {json.dumps({'done': True})}\n\n"
+    finally:
+        db.close()
