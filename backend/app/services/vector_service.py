@@ -140,6 +140,50 @@ async def generate_scene(
     )
 
 
+async def create_document_from_scene(
+    db: Session,
+    user_id,
+    llm_client,
+    model: str,
+    prompt: str,
+    purpose: str,
+    canvas_width: int,
+    canvas_height: int,
+    max_objects: int,
+    max_retries: int,
+) -> VectorDocument:
+    """Generates a scene and persists it as a VectorDocument + VectorObjects — the exact
+    generate-then-persist logic `POST /vector/documents` uses, extracted here so
+    creative_service's brand-aware generation can call the same function instead of
+    duplicating it. Raises VectorGenerationError exactly like generate_scene does; the
+    caller is responsible for turning that into an HTTP response."""
+    object_creates = await generate_scene(llm_client, model, prompt, max_objects, max_retries, purpose)
+
+    document = VectorDocument(
+        user_id=user_id,
+        title=prompt[:255],
+        purpose=purpose,
+        canvas_width=canvas_width,
+        canvas_height=canvas_height,
+    )
+    db.add(document)
+    db.flush()
+
+    for oc in object_creates:
+        db.add(
+            VectorObject(
+                document_id=document.id,
+                object_type=oc.props.object_type,
+                z_index=oc.z_index,
+                layer_name=oc.layer_name,
+                props=oc.props.model_dump(),
+            )
+        )
+    db.commit()
+    db.refresh(document)
+    return document
+
+
 def _resolve_operation(op_input, objects: list[VectorObject]) -> VectorOperation | None:
     if isinstance(op_input, AddObjectOpInput):
         return AddObjectOp(object=op_input.object)

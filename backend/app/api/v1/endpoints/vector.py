@@ -23,8 +23,8 @@ from app.services.vector_service import (
     AddObjectOp,
     SetPropOp,
     apply_operation,
+    create_document_from_scene,
     generate_edit_operation,
-    generate_scene,
     render_svg,
 )
 
@@ -68,35 +68,20 @@ async def create_vector_document(
         )
 
     try:
-        object_creates = await generate_scene(
-            llm_client, settings.ollama_model, payload.prompt, max_objects, settings.vector_max_retries, payload.purpose
+        return await create_document_from_scene(
+            db,
+            user.id,
+            llm_client,
+            settings.ollama_model,
+            payload.prompt,
+            payload.purpose,
+            canvas_width,
+            canvas_height,
+            max_objects,
+            settings.vector_max_retries,
         )
     except VectorGenerationError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
-
-    document = VectorDocument(
-        user_id=user.id,
-        title=payload.prompt[:255],
-        purpose=payload.purpose,
-        canvas_width=canvas_width,
-        canvas_height=canvas_height,
-    )
-    db.add(document)
-    db.flush()
-
-    for oc in object_creates:
-        db.add(
-            VectorObject(
-                document_id=document.id,
-                object_type=oc.props.object_type,
-                z_index=oc.z_index,
-                layer_name=oc.layer_name,
-                props=oc.props.model_dump(),
-            )
-        )
-    db.commit()
-    db.refresh(document)
-    return document
 
 
 @router.get("/documents", response_model=list[VectorDocumentRead])

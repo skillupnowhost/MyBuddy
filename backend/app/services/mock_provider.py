@@ -15,6 +15,7 @@ class MockProvider(LLMProvider):
         # last entry repeats. `reply` is used as-is when `replies` isn't given.
         self.replies = replies
         self.call_count = 0
+        self.last_messages: list[dict] | None = None
 
     def _next_reply(self) -> str:
         if not self.replies:
@@ -26,6 +27,7 @@ class MockProvider(LLMProvider):
         self, model: str, messages: list[dict], temperature: float = 0.7, usage_sink: dict | None = None
     ) -> AsyncGenerator[str, None]:
         self.last_model = model
+        self.last_messages = messages
         reply = self._next_reply()
         self.call_count += 1
         chunk_size = 5
@@ -38,6 +40,7 @@ class MockProvider(LLMProvider):
 
     async def chat(self, model: str, messages: list[dict], temperature: float = 0.7) -> str:
         self.last_model = model
+        self.last_messages = messages
         reply = self._next_reply()
         self.call_count += 1
         return reply

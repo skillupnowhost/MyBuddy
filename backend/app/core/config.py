@@ -111,6 +111,9 @@ class Settings(BaseSettings):
     motion_max_total_duration_ms: int = 30000
     motion_max_clips: int = 20
 
+    # --- Creative Director ---
+    creative_max_assets_per_project: int = 50
+
     # --- Sandbox (code execution, ADMIN-only) ---
     # This runs submitted code as a plain OS subprocess, not a container — no filesystem
     # jail, no network isolation, no memory/CPU cap beyond the timeout. See

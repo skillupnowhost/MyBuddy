@@ -21,6 +21,9 @@ from app.db.models.animation_document import AnimationDocument
 from app.db.models.animation_keyframe import AnimationKeyframe
 from app.db.models.motion_project import MotionProject
 from app.db.models.motion_clip import MotionClip
+from app.db.models.brand_kit import BrandKit
+from app.db.models.creative_project import CreativeProject
+from app.db.models.creative_asset import CreativeAsset
 
 __all__ = [
     "User",
@@ -46,4 +49,7 @@ __all__ = [
     "AnimationKeyframe",
     "MotionProject",
     "MotionClip",
+    "BrandKit",
+    "CreativeProject",
+    "CreativeAsset",
 ]

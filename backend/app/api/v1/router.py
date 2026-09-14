@@ -7,6 +7,7 @@ from app.api.v1.endpoints import (
     chat,
     code,
     conversations,
+    creative,
     documents,
     image_edit,
     image_generation,
@@ -34,3 +35,4 @@ api_router.include_router(image_edit.router)
 api_router.include_router(vector.router)
 api_router.include_router(animation.router)
 api_router.include_router(motion.router)
+api_router.include_router(creative.router)

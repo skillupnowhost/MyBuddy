@@ -271,6 +271,36 @@ export interface MotionProjectItem {
   updated_at: string;
 }
 
+export type CreativeAssetType = "VECTOR" | "ANIMATION" | "MOTION";
+
+export interface BrandKitItem {
+  id: string;
+  name: string;
+  primary_color: string | null;
+  secondary_color: string | null;
+  accent_color: string | null;
+  font_family: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreativeAssetItem {
+  id: string;
+  asset_type: CreativeAssetType;
+  asset_id: string;
+  label: string | null;
+  created_at: string;
+}
+
+export interface CreativeProjectItem {
+  id: string;
+  title: string;
+  brand_kit_id: string | null;
+  assets: CreativeAssetItem[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SystemHealth {
   cpu_percent: number;
   ram_used_gb: number;
