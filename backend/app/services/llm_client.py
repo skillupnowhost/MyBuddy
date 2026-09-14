@@ -55,8 +55,15 @@ class OllamaProvider(LLMProvider):
         model: str,
         messages: list[dict],
         temperature: float = 0.7,
+        usage_sink: dict | None = None,
     ) -> AsyncGenerator[str, None]:
-        """Yields assistant content deltas as they stream from the local model."""
+        """Yields assistant content deltas as they stream from the local model.
+
+        If `usage_sink` is passed, it's filled in-place with real token/timing stats from
+        Ollama's final chunk (prompt_eval_count, eval_count, total_duration_ns) once the
+        stream completes — used for usage logging without changing the return type callers
+        already depend on.
+        """
         payload = {
             "model": model,
             "messages": messages,
@@ -74,6 +81,10 @@ class OllamaProvider(LLMProvider):
                     if content:
                         yield content
                     if chunk.get("done"):
+                        if usage_sink is not None:
+                            usage_sink["prompt_tokens"] = chunk.get("prompt_eval_count")
+                            usage_sink["completion_tokens"] = chunk.get("eval_count")
+                            usage_sink["duration_ms"] = (chunk.get("total_duration") or 0) // 1_000_000
                         break
 
     async def chat(self, model: str, messages: list[dict], temperature: float = 0.7) -> str:

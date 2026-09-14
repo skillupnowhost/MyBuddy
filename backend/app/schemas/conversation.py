@@ -11,6 +11,7 @@ class ConversationCreate(BaseModel):
     system_prompt: str | None = None
     model: str | None = None
     rag_enabled: bool = False
+    tools_enabled: bool = False
 
 
 class ConversationUpdate(BaseModel):
@@ -18,6 +19,7 @@ class ConversationUpdate(BaseModel):
     system_prompt: str | None = None
     model: str | None = None
     rag_enabled: bool | None = None
+    tools_enabled: bool | None = None
 
 
 class ConversationRead(BaseModel):
@@ -28,6 +30,7 @@ class ConversationRead(BaseModel):
     system_prompt: str | None
     model: str | None
     rag_enabled: bool
+    tools_enabled: bool
     created_at: datetime
     updated_at: datetime
 

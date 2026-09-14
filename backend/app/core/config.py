@@ -19,8 +19,17 @@ class Settings(BaseSettings):
 
     frontend_origin: str = "http://localhost:3000"
 
+    # --- Admin ---
+    # Comma-separated emails auto-promoted to ADMIN on registration. Empty by default —
+    # set this before the first registration to bootstrap an admin account.
+    admin_emails: str = ""
+
+    @property
+    def admin_email_set(self) -> set[str]:
+        return {e.strip().lower() for e in self.admin_emails.split(",") if e.strip()}
+
     # --- RAG / documents ---
-    storage_dir: str = "./data/documents"
+    storage_dir: str = "./data"
     max_upload_size_bytes: int = 20 * 1024 * 1024  # 20MB
     allowed_upload_content_types: tuple[str, ...] = (
         "application/pdf",

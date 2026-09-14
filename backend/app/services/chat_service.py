@@ -8,11 +8,12 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.db.models.conversation import Conversation
 from app.db.models.message import Message
+from app.db.models.usage_log import UsageLog
 from app.services.embedding_provider import EmbeddingProvider
 from app.services.llm_provider import LLMProvider
 from app.services.memory_service import extract_and_save_memories, get_memory_context
 from app.services.rag_service import build_rag_prompt, retrieve_context
-from app.services.tools import maybe_run_tool_call
+from app.services.tools import get_tools_system_prompt, maybe_run_tool_call
 from app.services.vector_store import VectorStoreProvider
 
 settings = get_settings()
@@ -25,11 +26,28 @@ def _history_for_ollama(conversation: Conversation, memory_context: str | None) 
         system_parts.append(conversation.system_prompt)
     if memory_context:
         system_parts.append(memory_context)
+    if conversation.tools_enabled:
+        system_parts.append(get_tools_system_prompt())
     if system_parts:
         history.append({"role": "system", "content": "\n\n".join(system_parts)})
     for msg in conversation.messages:
         history.append({"role": msg.role, "content": msg.content})
     return history
+
+
+def _log_usage(db: Session, user_id: uuid.UUID, model: str, usage_sink: dict) -> None:
+    if not usage_sink:
+        return
+    db.add(
+        UsageLog(
+            user_id=user_id,
+            model=model,
+            prompt_tokens=usage_sink.get("prompt_tokens"),
+            completion_tokens=usage_sink.get("completion_tokens"),
+            duration_ms=usage_sink.get("duration_ms"),
+        )
+    )
+    db.commit()
 
 
 async def stream_assistant_reply(
@@ -73,26 +91,29 @@ async def stream_assistant_reply(
                 ]
                 yield f"data: {json.dumps({'sources': sources})}\n\n"
 
+        usage_sink: dict = {}
         full_reply = ""
         try:
-            async for delta in llm_client.chat_stream(model, history):
+            async for delta in llm_client.chat_stream(model, history, usage_sink=usage_sink):
                 full_reply += delta
                 yield f"data: {json.dumps({'delta': delta})}\n\n"
 
-            tool_result = await maybe_run_tool_call(full_reply)
-            if tool_result is not None:
-                yield f"data: {json.dumps({'tool_call': tool_result.tool_name})}\n\n"
-                history.append({"role": "assistant", "content": full_reply})
-                history.append({"role": "user", "content": f"[Tool result: {tool_result.result}]"})
-                full_reply = ""
-                async for delta in llm_client.chat_stream(model, history):
-                    full_reply += delta
-                    yield f"data: {json.dumps({'delta': delta})}\n\n"
+            if conversation.tools_enabled:
+                tool_result = await maybe_run_tool_call(full_reply)
+                if tool_result is not None:
+                    yield f"data: {json.dumps({'tool_call': tool_result.tool_name})}\n\n"
+                    history.append({"role": "assistant", "content": full_reply})
+                    history.append({"role": "user", "content": f"[Tool result: {tool_result.result}]"})
+                    full_reply = ""
+                    async for delta in llm_client.chat_stream(model, history, usage_sink=usage_sink):
+                        full_reply += delta
+                        yield f"data: {json.dumps({'delta': delta})}\n\n"
         finally:
             if full_reply:
                 assistant_message = Message(conversation_id=conversation.id, role="assistant", content=full_reply)
                 db.add(assistant_message)
                 db.commit()
+                _log_usage(db, conversation.user_id, model, usage_sink)
                 asyncio.create_task(
                     extract_and_save_memories(
                         session_factory, llm_client, model, conversation.user_id, user_content, full_reply

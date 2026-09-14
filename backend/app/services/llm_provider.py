@@ -13,9 +13,11 @@ class LLMProvider(ABC):
 
     @abstractmethod
     async def chat_stream(
-        self, model: str, messages: list[dict], temperature: float = 0.7
+        self, model: str, messages: list[dict], temperature: float = 0.7, usage_sink: dict | None = None
     ) -> AsyncGenerator[str, None]:
-        """Yield assistant content deltas as they are generated."""
+        """Yield assistant content deltas as they are generated. If `usage_sink` is given,
+        implementations that can report real token/timing stats fill it in-place once the
+        stream completes; implementations that can't simply leave it untouched."""
         raise NotImplementedError
         yield  # pragma: no cover - makes this an async generator for type-checkers
 

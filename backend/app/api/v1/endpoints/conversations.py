@@ -43,6 +43,7 @@ def create_conversation(
         system_prompt=payload.system_prompt,
         model=payload.model,
         rag_enabled=payload.rag_enabled,
+        tools_enabled=payload.tools_enabled,
     )
     db.add(conversation)
     db.commit()
