@@ -1,10 +1,12 @@
 import { apiFetch } from "./api";
+import type { Source } from "./types";
 
 export async function streamChatMessage(
   conversationId: string,
   content: string,
   onDelta: (delta: string) => void,
   signal?: AbortSignal,
+  onSources?: (sources: Source[]) => void,
 ): Promise<void> {
   const resp = await apiFetch(`/api/v1/conversations/${conversationId}/messages`, {
     method: "POST",
@@ -34,6 +36,7 @@ export async function streamChatMessage(
       const jsonStr = trimmed.slice("data:".length).trim();
       if (!jsonStr) continue;
       const payload = JSON.parse(jsonStr);
+      if (payload.sources) onSources?.(payload.sources);
       if (payload.delta) onDelta(payload.delta);
       if (payload.done) return;
     }

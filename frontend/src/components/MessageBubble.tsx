@@ -53,6 +53,21 @@ export default function MessageBubble({ message }: { message: Message }) {
         >
           {message.content}
         </ReactMarkdown>
+
+        {message.sources && message.sources.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5 border-t border-white/10 pt-2">
+            {message.sources.map((source, i) => (
+              <span
+                key={i}
+                className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/60"
+                title={source.filename}
+              >
+                📄 {source.filename}
+                {source.page_number ? ` p.${source.page_number}` : ""}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

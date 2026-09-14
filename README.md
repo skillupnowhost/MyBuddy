@@ -2,7 +2,7 @@
 
 Your private, self-hosted AI companion. Open-source, no paid inference API required.
 
-This is **Phase 1** of a multi-phase build: real local LLM inference, streaming chat, auth, and conversation history. See [Roadmap](#roadmap) for what comes next (RAG, memory, fine-tuning, custom models).
+This build now covers **Phase 1** (real local LLM inference, streaming chat, auth, conversation history) and **Phase 2** (document upload + RAG). See [Roadmap](#roadmap) for what comes next (memory, fine-tuning, custom models).
 
 ## Architecture
 
@@ -10,16 +10,23 @@ This is **Phase 1** of a multi-phase build: real local LLM inference, streaming 
 Frontend (Next.js)
       │
       ▼
-Backend (FastAPI) ──── PostgreSQL (users, conversations, messages)
-      │
-      ▼
-LLMProvider abstraction
+Backend (FastAPI) ──── PostgreSQL (users, conversations, messages, documents, chunks+embeddings)
+      │              │
+      ▼              ▼
+LLMProvider    EmbeddingProvider ──→ Ollama (all-minilm)
       │
       ▼
 OllamaProvider ──→ Ollama (real local inference)
+
+RAG query path:
+  user message ─→ EmbeddingProvider.embed() ─→ VectorStoreProvider.query()
+                        (cosine similarity over the user's chunk embeddings, in Postgres)
+                 ─→ top-k chunks ─→ wrapped as untrusted context ─→ LLMProvider
 ```
 
-The backend never calls Ollama's HTTP API directly from routes — everything goes through `app/services/llm_provider.py`'s `LLMProvider` interface (`backend/app/services/llm_provider.py`). Swapping in vLLM, llama.cpp, or a future MyBuddy-trained model means adding one new implementation class; nothing else changes.
+The backend never calls Ollama's HTTP API directly from routes — everything goes through three abstractions: `LLMProvider` (`backend/app/services/llm_provider.py`), `EmbeddingProvider` (`backend/app/services/embedding_provider.py`), and `VectorStoreProvider` (`backend/app/services/vector_store.py`). Swapping in vLLM, a hosted embedding API, or Qdrant means adding one new implementation class each; nothing else changes.
+
+**Why embeddings live in Postgres instead of a dedicated vector database:** the original plan called for Qdrant, but this dev machine has no Docker and no C++ build tools (needed by Chroma's `hnswlib` dependency). Storing each chunk's embedding as a JSON column and doing brute-force cosine similarity in Python/numpy avoids both problems entirely and is genuinely fine at single-user, self-hosted scale (thousands of chunks, not millions). If that stops being true, swap `PostgresVectorStoreProvider` for a real ANN-backed one — the rest of the codebase doesn't need to change.
 
 ## Requirements
 
@@ -48,6 +55,7 @@ Running Postgres and Ollama natively avoids Docker Desktop's VM overhead, which 
 ```powershell
 winget install Ollama.Ollama
 ollama pull llama3.2:1b
+ollama pull all-minilm
 ```
 
 Ollama runs as a background service on `localhost:11434` once installed.
@@ -123,27 +131,36 @@ Add `-f docker-compose.yml -f docker-compose.gpu.yml` if the host has an NVIDIA 
 }
 ```
 
-## Security notes (Phase 1)
+## RAG (Phase 2)
+
+- Upload a document from the "Knowledge base" panel in the sidebar (PDF, TXT, MD, or DOCX; 20MB limit by default).
+- It's processed in the background: extracted → chunked (~1000 chars, 150 overlap, page numbers preserved for PDFs) → embedded (`all-minilm` via Ollama) → status moves `UPLOADING → PROCESSING → EMBEDDING → READY` (or `FAILED` with a reason).
+- Toggle "Use my documents (RAG)" on a conversation to have relevant chunks retrieved and injected into the prompt for that conversation's messages. Retrieved content is always wrapped as explicitly untrusted context in the prompt — the model is instructed to treat it as reference material, never as instructions (defends against prompt injection via document content per the standard RAG threat model).
+- Responses show which document(s) (and page numbers, for PDFs) were used as sources.
+- Documents, chunks, and embeddings are strictly isolated per user — verified by automated tests (`backend/tests/test_documents.py`).
+
+## Security notes
 
 - Passwords hashed with bcrypt, never stored plaintext.
-- JWT access tokens (short-lived) + refresh tokens; all conversation/chat/model routes require a valid access token.
+- JWT access tokens (short-lived) + refresh tokens; all conversation/chat/model/document routes require a valid access token.
 - CORS restricted to `FRONTEND_ORIGIN`.
 - Auth endpoints rate-limited.
-- Every conversation/message query is scoped to `user_id` — no cross-user access.
+- Every conversation/message/document/chunk query is scoped to `user_id` — no cross-user access.
+- Uploaded files are stored under a randomized filename (never the client-supplied name), namespaced by user id, outside any web-served path; content-type and size are validated before anything touches disk.
 - Secrets live in `.env`, never in code. `.env` is gitignored.
 
 ## Roadmap
 
 | Phase | Focus |
 |---|---|
-| **1 (this)** | Real local LLM, streaming chat, auth, conversation history, OpenAI-compatible API |
-| 2 | Document upload, embeddings, Qdrant, RAG |
+| 1 | Real local LLM, streaming chat, auth, conversation history, OpenAI-compatible API |
+| **2 (this)** | Document upload, embeddings, RAG |
 | 3 | Long-term memory (user preferences, persistent facts) |
 | 4 | Fine-tuning (LoRA/QLoRA), model registry |
 | 5 | Tools/agents, model evaluation, admin dashboard |
 | 6 | Experimental custom-trained MyBuddy model (research track) |
 
-Later phases attach to this codebase without rework: RAG will add `backend/app/rag/` + a vector store service in Compose; memory will add `backend/app/memory/`; fine-tuning lives in a separate `training/` module that never runs inside the API process.
+Later phases attach to this codebase without rework: memory will add `backend/app/services/memory_service.py` alongside a `memories` table, following the same pattern as documents; fine-tuning lives in a separate `training/` module that never runs inside the API process.
 
 ## License
 

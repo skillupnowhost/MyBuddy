@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import MessageBubble from "@/components/MessageBubble";
+import DocumentsPanel from "@/components/DocumentsPanel";
 import { apiJson } from "@/lib/api";
 import { clearTokens, isLoggedIn } from "@/lib/auth";
 import { streamChatMessage } from "@/lib/stream";
@@ -17,8 +18,11 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDocuments, setShowDocuments] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const activeConversation = conversations.find((c) => c.id === activeId) ?? null;
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -73,6 +77,15 @@ export default function ChatPage() {
     }
   }
 
+  async function handleToggleRag() {
+    if (!activeConversation) return;
+    const updated = await apiJson<Conversation>(`/api/v1/conversations/${activeConversation.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ rag_enabled: !activeConversation.rag_enabled }),
+    });
+    setConversations((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+  }
+
   function handleLogout() {
     clearTokens();
     router.replace("/login");
@@ -115,6 +128,9 @@ export default function ChatPage() {
           setMessages((prev) => prev.map((m) => (m.id === "streaming" ? { ...m, content: assembled } : m)));
         },
         controller.signal,
+        (sources) => {
+          setMessages((prev) => prev.map((m) => (m.id === "streaming" ? { ...m, sources } : m)));
+        },
       );
     } catch (err) {
       if (!(err instanceof DOMException && err.name === "AbortError")) {
@@ -141,7 +157,10 @@ export default function ChatPage() {
         onNew={handleNewConversation}
         onDelete={handleDeleteConversation}
         onLogout={handleLogout}
+        onOpenDocuments={() => setShowDocuments(true)}
       />
+
+      {showDocuments && <DocumentsPanel onClose={() => setShowDocuments(false)} />}
 
       <main className="flex flex-1 flex-col">
         <div className="flex-1 overflow-y-auto px-4 py-6">
@@ -163,36 +182,49 @@ export default function ChatPage() {
         {error && <p className="mx-auto mb-2 max-w-3xl text-sm text-red-400">{error}</p>}
 
         <div className="border-t border-white/10 p-4">
-          <div className="mx-auto flex max-w-3xl items-end gap-2">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder="Message MyBuddy..."
-              rows={1}
-              className="max-h-40 flex-1 resize-none rounded-xl border border-white/10 bg-[#161922] px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
-            />
-            {isStreaming ? (
-              <button
-                onClick={handleStop}
-                className="rounded-xl bg-red-600 px-4 py-3 text-sm font-medium text-white hover:bg-red-500"
-              >
-                Stop
-              </button>
-            ) : (
-              <button
-                onClick={handleSend}
-                disabled={!input.trim()}
-                className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40"
-              >
-                Send
-              </button>
+          <div className="mx-auto flex max-w-3xl flex-col gap-2">
+            {activeConversation && (
+              <label className="flex w-fit items-center gap-2 text-xs text-white/50">
+                <input
+                  type="checkbox"
+                  checked={activeConversation.rag_enabled}
+                  onChange={handleToggleRag}
+                  className="accent-blue-600"
+                />
+                Use my documents (RAG) for this conversation
+              </label>
             )}
+            <div className="flex items-end gap-2">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder="Message MyBuddy..."
+                rows={1}
+                className="max-h-40 flex-1 resize-none rounded-xl border border-white/10 bg-[#161922] px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+              />
+              {isStreaming ? (
+                <button
+                  onClick={handleStop}
+                  className="rounded-xl bg-red-600 px-4 py-3 text-sm font-medium text-white hover:bg-red-500"
+                >
+                  Stop
+                </button>
+              ) : (
+                <button
+                  onClick={handleSend}
+                  disabled={!input.trim()}
+                  className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40"
+                >
+                  Send
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </main>

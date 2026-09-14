@@ -25,11 +25,12 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     llm_client = get_llm_client()
-    try:
-        await llm_client.ensure_model(settings.ollama_model)
-        logger.info("Ollama model '%s' is ready", settings.ollama_model)
-    except Exception as exc:  # noqa: BLE001 - startup should not crash if Ollama is briefly unavailable
-        logger.warning("Could not verify/pull default model '%s': %s", settings.ollama_model, exc)
+    for model in (settings.ollama_model, settings.ollama_embedding_model):
+        try:
+            await llm_client.ensure_model(model)
+            logger.info("Ollama model '%s' is ready", model)
+        except Exception as exc:  # noqa: BLE001 - startup should not crash if Ollama is briefly unavailable
+            logger.warning("Could not verify/pull model '%s': %s", model, exc)
     yield
 
 
