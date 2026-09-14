@@ -83,6 +83,22 @@ class Settings(BaseSettings):
     image_edit_max_outpaint_padding: int = 256
     image_edit_bg_removal_model: str = "u2net"
 
+    # --- Video generation (MyBuddy Video, text-to-video) ---
+    # Far heavier than image generation (diffusion over many frames, not one) — on this
+    # project's CPU-only dev hardware this is architecture-complete but not runnable in any
+    # practical sense; see video/README.md. num_frames/fps/steps caps exist so a request
+    # can't accidentally ask for something that would never finish even on a GPU machine.
+    video_gen_model: str = "damo-vilab/text-to-video-ms-1.7b"
+    video_gen_default_steps: int = 25
+    video_gen_max_steps: int = 50
+    video_gen_default_width: int = 256
+    video_gen_default_height: int = 256
+    video_gen_max_width: int = 512
+    video_gen_max_height: int = 512
+    video_gen_default_num_frames: int = 16
+    video_gen_max_num_frames: int = 64
+    video_gen_fps: int = 8
+
     # --- Vector graphics ---
     # No dedicated model setting: generation is plain JSON-producing text generation, not a
     # specialized capability like vision/code, so it reuses settings.ollama_model directly

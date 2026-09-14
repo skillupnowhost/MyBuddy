@@ -17,6 +17,8 @@ from app.api.v1.endpoints import (
     motion,
     training,
     vector,
+    video_generation,
+    videos,
     workspaces,
 )
 
@@ -37,4 +39,6 @@ api_router.include_router(vector.router)
 api_router.include_router(animation.router)
 api_router.include_router(motion.router)
 api_router.include_router(creative.router)
+api_router.include_router(videos.router)
+api_router.include_router(video_generation.router)
 api_router.include_router(workspaces.router)

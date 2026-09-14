@@ -1,0 +1,24 @@
+# Video generation environment — deliberately separate from backend/requirements.txt and
+# from imagegen/requirements.txt. Install into its own venv (video/.venv) so the main API's
+# dependencies stay light:
+#
+#   cd video
+#   python -m venv .venv
+#   .venv\Scripts\activate      # Windows
+#   pip install -r requirements.txt
+#
+# GPU strongly required in practice. Text-to-video diffusion is dramatically heavier than
+# text-to-image (many frames, each its own denoising process) — on CPU-only hardware this
+# will not complete in any practical amount of time, not just "be slow." See README.md.
+
+torch==2.5.1
+diffusers==0.31.0
+transformers==4.47.1
+accelerate==1.2.1
+safetensors==0.4.5
+sqlalchemy==2.0.36
+psycopg[binary]==3.2.3
+
+# Frame sequence -> mp4 encoding (diffusers.utils.export_to_video).
+imageio==2.36.1
+imageio-ffmpeg==0.5.1

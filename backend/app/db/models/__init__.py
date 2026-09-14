@@ -30,6 +30,8 @@ from app.db.models.arena_comparison_result import ArenaComparisonResult
 from app.db.models.expert_pipeline_step import ExpertPipelineStep
 from app.db.models.workspace import Workspace
 from app.db.models.agent_step import AgentStep
+from app.db.models.video import Video
+from app.db.models.video_generation_job import VideoGenerationJob
 
 __all__ = [
     "User",
@@ -64,4 +66,6 @@ __all__ = [
     "ExpertPipelineStep",
     "Workspace",
     "AgentStep",
+    "Video",
+    "VideoGenerationJob",
 ]
