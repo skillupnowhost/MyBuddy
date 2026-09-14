@@ -4,6 +4,7 @@ from app.api.v1.endpoints import (
     admin,
     animation,
     auth,
+    camera_plans,
     characters,
     chat,
     code,
@@ -47,4 +48,5 @@ api_router.include_router(video_generation.router)
 api_router.include_router(storyboard.router)
 api_router.include_router(characters.router)
 api_router.include_router(world_bibles.router)
+api_router.include_router(camera_plans.router)
 api_router.include_router(workspaces.router)

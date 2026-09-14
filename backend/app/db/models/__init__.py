@@ -36,6 +36,7 @@ from app.db.models.storyboard import Storyboard
 from app.db.models.storyboard_shot import StoryboardShot
 from app.db.models.character import Character
 from app.db.models.world_bible import WorldBible
+from app.db.models.camera_plan import CameraPlan
 
 __all__ = [
     "User",
@@ -76,4 +77,5 @@ __all__ = [
     "StoryboardShot",
     "Character",
     "WorldBible",
+    "CameraPlan",
 ]
