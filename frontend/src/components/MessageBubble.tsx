@@ -54,6 +54,14 @@ export default function MessageBubble({ message }: { message: Message }) {
           {message.content}
         </ReactMarkdown>
 
+        {message.toolCall && (
+          <div className="mt-2 border-t border-white/10 pt-2">
+            <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-300">
+              🔧 used tool: {message.toolCall}
+            </span>
+          </div>
+        )}
+
         {message.sources && message.sources.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5 border-t border-white/10 pt-2">
             {message.sources.map((source, i) => (

@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import MessageBubble from "@/components/MessageBubble";
 import DocumentsPanel from "@/components/DocumentsPanel";
+import MemoriesPanel from "@/components/MemoriesPanel";
 import { apiJson } from "@/lib/api";
+import { getCurrentUser } from "@/lib/admin";
 import { clearTokens, isLoggedIn } from "@/lib/auth";
 import { streamChatMessage } from "@/lib/stream";
 import type { Conversation, Message } from "@/lib/types";
@@ -19,6 +21,8 @@ export default function ChatPage() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDocuments, setShowDocuments] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -30,6 +34,9 @@ export default function ChatPage() {
       return;
     }
     loadConversations();
+    getCurrentUser()
+      .then((user) => setIsAdmin(user.role === "ADMIN"))
+      .catch(() => {});
   }, [router]);
 
   useEffect(() => {
@@ -77,11 +84,11 @@ export default function ChatPage() {
     }
   }
 
-  async function handleToggleRag() {
+  async function handleToggleFlag(flag: "rag_enabled" | "tools_enabled") {
     if (!activeConversation) return;
     const updated = await apiJson<Conversation>(`/api/v1/conversations/${activeConversation.id}`, {
       method: "PATCH",
-      body: JSON.stringify({ rag_enabled: !activeConversation.rag_enabled }),
+      body: JSON.stringify({ [flag]: !activeConversation[flag] }),
     });
     setConversations((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
   }
@@ -131,6 +138,9 @@ export default function ChatPage() {
         (sources) => {
           setMessages((prev) => prev.map((m) => (m.id === "streaming" ? { ...m, sources } : m)));
         },
+        (toolName) => {
+          setMessages((prev) => prev.map((m) => (m.id === "streaming" ? { ...m, toolCall: toolName } : m)));
+        },
       );
     } catch (err) {
       if (!(err instanceof DOMException && err.name === "AbortError")) {
@@ -158,9 +168,12 @@ export default function ChatPage() {
         onDelete={handleDeleteConversation}
         onLogout={handleLogout}
         onOpenDocuments={() => setShowDocuments(true)}
+        onOpenMemory={() => setShowMemory(true)}
+        isAdmin={isAdmin}
       />
 
       {showDocuments && <DocumentsPanel onClose={() => setShowDocuments(false)} />}
+      {showMemory && <MemoriesPanel onClose={() => setShowMemory(false)} />}
 
       <main className="flex flex-1 flex-col">
         <div className="flex-1 overflow-y-auto px-4 py-6">
@@ -184,15 +197,26 @@ export default function ChatPage() {
         <div className="border-t border-white/10 p-4">
           <div className="mx-auto flex max-w-3xl flex-col gap-2">
             {activeConversation && (
-              <label className="flex w-fit items-center gap-2 text-xs text-white/50">
-                <input
-                  type="checkbox"
-                  checked={activeConversation.rag_enabled}
-                  onChange={handleToggleRag}
-                  className="accent-blue-600"
-                />
-                Use my documents (RAG) for this conversation
-              </label>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex w-fit items-center gap-2 text-xs text-white/50">
+                  <input
+                    type="checkbox"
+                    checked={activeConversation.rag_enabled}
+                    onChange={() => handleToggleFlag("rag_enabled")}
+                    className="accent-blue-600"
+                  />
+                  Use my documents (RAG)
+                </label>
+                <label className="flex w-fit items-center gap-2 text-xs text-white/50">
+                  <input
+                    type="checkbox"
+                    checked={activeConversation.tools_enabled}
+                    onChange={() => handleToggleFlag("tools_enabled")}
+                    className="accent-blue-600"
+                  />
+                  Allow tools (calculator, date/time)
+                </label>
+              </div>
             )}
             <div className="flex items-end gap-2">
               <textarea

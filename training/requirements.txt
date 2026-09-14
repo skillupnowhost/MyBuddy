@@ -1,0 +1,19 @@
+# Fine-tuning environment — deliberately separate from backend/requirements.txt.
+# Install into its own venv (training/.venv) so the main API's dependencies stay light:
+#
+#   cd training
+#   python -m venv .venv
+#   .venv\Scripts\activate      # Windows
+#   pip install -r requirements.txt
+#
+# GPU strongly recommended. On CPU-only hardware, expect this to be extremely slow or to
+# exhaust RAM even for a 1B-parameter base model — that's a hardware limit, not a bug.
+
+torch==2.5.1
+transformers==4.47.1
+peft==0.14.0
+trl==0.13.0
+datasets==3.2.0
+accelerate==1.2.1
+sqlalchemy==2.0.36
+psycopg[binary]==3.2.3

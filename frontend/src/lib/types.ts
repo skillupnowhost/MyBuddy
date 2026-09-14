@@ -4,6 +4,7 @@ export interface Conversation {
   system_prompt: string | null;
   model: string | null;
   rag_enabled: boolean;
+  tools_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -19,6 +20,7 @@ export interface Message {
   content: string;
   created_at: string;
   sources?: Source[];
+  toolCall?: string;
 }
 
 export type DocumentStatus = "UPLOADING" | "PROCESSING" | "EMBEDDING" | "READY" | "FAILED";
@@ -31,4 +33,88 @@ export interface DocumentItem {
   status: DocumentStatus;
   error_message: string | null;
   created_at: string;
+}
+
+export interface MemoryItem {
+  id: string;
+  content: string;
+  source: "manual" | "auto";
+  created_at: string;
+}
+
+export interface CurrentUser {
+  id: string;
+  email: string;
+  role: "USER" | "ADMIN";
+  created_at: string;
+}
+
+export type DatasetStatus = "UPLOADED" | "VALIDATED" | "INVALID";
+
+export interface DatasetItem {
+  id: string;
+  filename: string;
+  num_examples: number | null;
+  status: DatasetStatus;
+  error_message: string | null;
+  created_at: string;
+}
+
+export type TrainingJobStatus = "PENDING" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
+
+export interface TrainingJobItem {
+  id: string;
+  dataset_id: string;
+  base_model: string;
+  status: TrainingJobStatus;
+  config: Record<string, unknown>;
+  output_path: string | null;
+  error_message: string | null;
+  eval_metrics: Record<string, number> | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export type ModelStatus = "EXPERIMENTAL" | "CANARY" | "STAGING" | "PRODUCTION" | "ARCHIVED" | "REJECTED";
+
+export interface RegisteredModelItem {
+  id: string;
+  name: string;
+  version: string;
+  base_model: string;
+  capability: string;
+  quantization: string | null;
+  location: string;
+  status: ModelStatus;
+  eval_score: number | null;
+  promoted_at: string | null;
+  created_at: string;
+}
+
+export interface AdminUserItem {
+  id: string;
+  email: string;
+  role: "USER" | "ADMIN";
+  created_at: string;
+}
+
+export interface AdminStats {
+  total_users: number;
+  total_conversations: number;
+  total_messages: number;
+  total_documents: number;
+  total_memories: number;
+  total_training_jobs: number;
+}
+
+export interface SystemHealth {
+  cpu_percent: number;
+  ram_used_gb: number;
+  ram_total_gb: number;
+  ram_percent: number;
+  disk_used_gb: number;
+  disk_total_gb: number;
+  disk_percent: number;
+  database_ok: boolean;
+  llm_ok: boolean;
 }

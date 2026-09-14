@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Conversation } from "@/lib/types";
 
 interface SidebarProps {
@@ -8,6 +9,8 @@ interface SidebarProps {
   onDelete: (id: string) => void;
   onLogout: () => void;
   onOpenDocuments: () => void;
+  onOpenMemory: () => void;
+  isAdmin: boolean;
 }
 
 export default function Sidebar({
@@ -18,6 +21,8 @@ export default function Sidebar({
   onDelete,
   onLogout,
   onOpenDocuments,
+  onOpenMemory,
+  isAdmin,
 }: SidebarProps) {
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-white/10 bg-[#12141c]">
@@ -38,6 +43,26 @@ export default function Sidebar({
         >
           📄 Knowledge base
         </button>
+        <button
+          onClick={onOpenMemory}
+          className="w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
+        >
+          🧠 Memory
+        </button>
+        <Link
+          href="/finetune"
+          className="block w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
+        >
+          🛠️ Fine-tuning
+        </Link>
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className="block w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
+          >
+            ⚙️ Admin
+          </Link>
+        )}
       </div>
 
       <div className="mt-3 flex-1 space-y-1 overflow-y-auto px-3">

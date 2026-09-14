@@ -19,6 +19,7 @@ class UserRead(BaseModel):
 
     id: uuid.UUID
     email: EmailStr
+    role: str
     created_at: datetime
 
 

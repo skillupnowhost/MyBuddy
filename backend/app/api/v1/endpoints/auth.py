@@ -17,7 +17,6 @@ from app.db.models.user import User
 from app.schemas.user import RefreshRequest, TokenPair, UserCreate, UserLogin, UserRead
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-settings = get_settings()
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
@@ -27,7 +26,9 @@ def register(request: Request, payload: UserCreate, db: Session = Depends(get_db
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
-    role = "ADMIN" if payload.email.lower() in settings.admin_email_set else "USER"
+    # Fetched per-call (not module-level) so ADMIN_EMAILS changes are picked up without a
+    # process restart in dev/test — get_settings() itself is still cached via lru_cache.
+    role = "ADMIN" if payload.email.lower() in get_settings().admin_email_set else "USER"
     user = User(email=payload.email, hashed_password=hash_password(payload.password), role=role)
     db.add(user)
     db.commit()

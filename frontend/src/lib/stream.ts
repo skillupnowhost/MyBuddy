@@ -7,6 +7,7 @@ export async function streamChatMessage(
   onDelta: (delta: string) => void,
   signal?: AbortSignal,
   onSources?: (sources: Source[]) => void,
+  onToolCall?: (toolName: string) => void,
 ): Promise<void> {
   const resp = await apiFetch(`/api/v1/conversations/${conversationId}/messages`, {
     method: "POST",
@@ -37,6 +38,7 @@ export async function streamChatMessage(
       if (!jsonStr) continue;
       const payload = JSON.parse(jsonStr);
       if (payload.sources) onSources?.(payload.sources);
+      if (payload.tool_call) onToolCall?.(payload.tool_call);
       if (payload.delta) onDelta(payload.delta);
       if (payload.done) return;
     }

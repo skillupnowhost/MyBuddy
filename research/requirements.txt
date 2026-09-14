@@ -1,0 +1,12 @@
+# Research track: training a custom MyBuddy model from scratch. Deliberately its own
+# environment — nothing here is a dependency of the backend or the fine-tuning pipeline.
+#
+#   cd research
+#   python -m venv .venv
+#   .venv\Scripts\activate      # Windows
+#   pip install -r requirements.txt
+
+torch==2.5.1
+tokenizers==0.21.0
+numpy==2.2.1
+tqdm==4.67.1

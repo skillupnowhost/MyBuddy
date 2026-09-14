@@ -1,0 +1,5 @@
+MyBuddy is a self-hosted AI assistant. It runs entirely on local infrastructure, with no dependency on a paid inference API. The project is organized into phases: chat, retrieval-augmented generation, long-term memory, fine-tuning, an advanced platform layer with tools and administration, and finally a research track for training a custom model from scratch.
+
+A transformer is a neural network architecture built from attention and feed-forward layers. Each layer refines a sequence of token representations, letting the model attend to relevant earlier tokens when predicting the next one. Modern decoder-only language models stack many such layers, use rotary positional embeddings to encode token order, and train with next-token prediction over large text corpora.
+
+This sample corpus exists only to prove the training loop runs correctly end to end. It is far too small to produce a meaningful model — real pretraining requires many gigabytes of diverse, deduplicated, appropriately licensed text.

@@ -2,7 +2,7 @@
 
 Your private, self-hosted AI companion. Open-source, no paid inference API required.
 
-This build now covers **Phase 1** (real local LLM inference, streaming chat, auth, conversation history) and **Phase 2** (document upload + RAG). See [Roadmap](#roadmap) for what comes next (memory, fine-tuning, custom models).
+This build covers **Phases 1-5** end to end: real local LLM chat, RAG, long-term memory, opt-in tool calling, fine-tuning infrastructure, and an admin dashboard. **Phase 6** (a from-scratch research model) has real, correct, syntax-verified code in `research/` that hasn't been executed on this particular dev machine — see that directory's README for why. See [Roadmap](#roadmap) for the phase-by-phase breakdown.
 
 ## Architecture
 
@@ -139,28 +139,51 @@ Add `-f docker-compose.yml -f docker-compose.gpu.yml` if the host has an NVIDIA 
 - Responses show which document(s) (and page numbers, for PDFs) were used as sources.
 - Documents, chunks, and embeddings are strictly isolated per user — verified by automated tests (`backend/tests/test_documents.py`).
 
+## Memory (Phase 3)
+
+- Manual: add/view/delete facts yourself from the "🧠 Memory" panel in the sidebar — always under your control.
+- Automatic: after each assistant reply, a background task (fire-and-forget, adds no latency to the chat response) asks the model to extract durable facts from that exchange (`backend/app/services/memory_service.py`). Extracted facts are surfaced to future conversations via a system-prompt block, deduplicated against what's already stored.
+- **Honest limitation**: automatic extraction quality depends entirely on the underlying model. `llama3.2:1b` follows the "respond with only a JSON array" instruction correctly (always valid, parseable output — verified directly against the live model, not just mocked in tests) but is very conservative and often extracts nothing even from clearly durable statements ("my name is X", "I'm allergic to Y"). A few-shot version of the prompt was tried and made things *worse* (malformed output, hallucinated content) — the plain zero-shot prompt fails safely, so that's what shipped. Use a larger model (3B+) via `OLLAMA_MODEL` for meaningfully useful auto-extraction; manual memory management works reliably regardless of model size.
+
+## Tools (Phase 5)
+
+Opt-in per conversation ("Allow tools" toggle). Two safe, deterministic built-ins — a calculator (AST-based safe arithmetic evaluator, never `eval()`) and current-date/time (`backend/app/services/tools/`). The model requests a tool via a fenced ` ```tool ` JSON block in its reply; the backend parses it, executes the tool, and feeds the result back for a final answer. New tools are added by implementing the `Tool` interface — never arbitrary code/shell execution.
+
+## Admin dashboard (Phase 5)
+
+Role-based (`USER`/`ADMIN`). Set `ADMIN_EMAILS` (comma-separated) before registering to bootstrap your first admin account; admins can promote/demote other users from `/admin`. Shows real usage stats (from Ollama's own reported token counts and timing, never estimated — `backend/app/db/models/usage_log.py`) and live system health (CPU/RAM/disk via `psutil`; no GPU metrics since this reference deployment has none).
+
+## Fine-tuning (Phase 4)
+
+Upload a `.jsonl` instruction dataset from `/finetune` (validated on upload — each line needs a `user` and `assistant` message); start a LoRA fine-tuning job against any Hugging Face base model id. Training always runs as a **separate OS process** (`training/scripts/train_lora.py`), never inside the API — verified live: a real job on this machine correctly went `PENDING → RUNNING → FAILED` with the message *"Training dependencies not installed... Run 'pip install -r training/requirements.txt'"*, because this dev machine has no GPU/torch installed. That's the correct, honest outcome, not a bug — see `training/README.md`. Completed jobs auto-register a model as `EXPERIMENTAL`; admins promote it through `CANARY → STAGING → PRODUCTION` (or `ARCHIVED`/`REJECTED`) from `/finetune`.
+
+## Research track (Phase 6)
+
+`research/` contains a from-scratch, from-random-initialization transformer (RoPE, causal attention, RMSNorm, SwiGLU) and a training loop — real, correct code, syntax-verified, but not executed live here (same hardware reasoning as fine-tuning, see `research/README.md`). This is a separate, educational scaffold from both the main app and the fine-tuning pipeline.
+
 ## Security notes
 
 - Passwords hashed with bcrypt, never stored plaintext.
-- JWT access tokens (short-lived) + refresh tokens; all conversation/chat/model/document routes require a valid access token.
+- JWT access tokens (short-lived) + refresh tokens; every conversation/chat/model/document/memory/dataset/training/admin route requires a valid access token, and admin routes additionally require the `ADMIN` role.
 - CORS restricted to `FRONTEND_ORIGIN`.
 - Auth endpoints rate-limited.
-- Every conversation/message/document/chunk query is scoped to `user_id` — no cross-user access.
+- Every user-owned row (conversations, messages, documents, chunks, memories, datasets, training jobs) is scoped to `user_id` in every query — no cross-user access, verified by automated tests including deliberate cross-user access attempts.
 - Uploaded files are stored under a randomized filename (never the client-supplied name), namespaced by user id, outside any web-served path; content-type and size are validated before anything touches disk.
+- The calculator tool uses an AST-based restricted evaluator, never Python's `eval()` — arbitrary code execution is not reachable through it.
 - Secrets live in `.env`, never in code. `.env` is gitignored.
 
 ## Roadmap
 
-| Phase | Focus |
-|---|---|
-| 1 | Real local LLM, streaming chat, auth, conversation history, OpenAI-compatible API |
-| **2 (this)** | Document upload, embeddings, RAG |
-| 3 | Long-term memory (user preferences, persistent facts) |
-| 4 | Fine-tuning (LoRA/QLoRA), model registry |
-| 5 | Tools/agents, model evaluation, admin dashboard |
-| 6 | Experimental custom-trained MyBuddy model (research track) |
+| Phase | Focus | Status |
+|---|---|---|
+| 1 | Real local LLM, streaming chat, auth, conversation history, OpenAI-compatible API | Done, verified live |
+| 2 | Document upload, embeddings, RAG | Done, verified live |
+| 3 | Long-term memory (manual + automatic extraction) | Done, verified live (see honest limitation above) |
+| 4 | Fine-tuning (LoRA), model registry, promotion lifecycle | Done, verified live (fails correctly without a GPU/torch env) |
+| 5 | Tools, usage logging, admin dashboard, system health | Done, verified live |
+| 6 | Experimental custom-trained MyBuddy model (research track) | Code complete, syntax-verified, not executed on this machine |
 
-Later phases attach to this codebase without rework: memory will add `backend/app/services/memory_service.py` alongside a `memories` table, following the same pattern as documents; fine-tuning lives in a separate `training/` module that never runs inside the API process.
+Each phase's abstractions (`LLMProvider`, `EmbeddingProvider`, `VectorStoreProvider`, `Tool`) mean later work rarely touches earlier code — e.g. tools were added without changing how RAG or memory work.
 
 ## License
 
