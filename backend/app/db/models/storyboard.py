@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -22,6 +22,14 @@ class Storyboard(Base):
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     script: Mapped[str] = mapped_column(Text, nullable=False)
+    # Consistency inputs (spec §8-9): guidance built from these is prepended to the
+    # generation prompt — see storyboard_service.generate_storyboard's `guidance` param and
+    # character_service.character_guidance/world_guidance. Stored so a regenerate/edit later
+    # can reuse the same consistency inputs without the caller re-specifying them.
+    character_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    world_bible_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("world_bibles.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

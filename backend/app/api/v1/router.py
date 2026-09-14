@@ -4,6 +4,7 @@ from app.api.v1.endpoints import (
     admin,
     animation,
     auth,
+    characters,
     chat,
     code,
     conversations,
@@ -21,6 +22,7 @@ from app.api.v1.endpoints import (
     video_generation,
     videos,
     workspaces,
+    world_bibles,
 )
 
 api_router = APIRouter()
@@ -43,4 +45,6 @@ api_router.include_router(creative.router)
 api_router.include_router(videos.router)
 api_router.include_router(video_generation.router)
 api_router.include_router(storyboard.router)
+api_router.include_router(characters.router)
+api_router.include_router(world_bibles.router)
 api_router.include_router(workspaces.router)

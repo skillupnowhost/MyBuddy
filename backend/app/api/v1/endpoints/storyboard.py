@@ -3,12 +3,15 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.api.v1.endpoints.characters import get_owned_character
+from app.api.v1.endpoints.world_bibles import get_owned_world_bible
 from app.core.config import get_settings
 from app.core.deps import get_current_user, get_db
 from app.db.models.storyboard import Storyboard
 from app.db.models.storyboard_shot import StoryboardShot
 from app.db.models.user import User
 from app.schemas.storyboard import StoryboardDetail, StoryboardGenerateRequest, StoryboardRead
+from app.services.consistency_service import character_guidance, world_guidance
 from app.services.llm_client import get_llm_client
 from app.services.llm_provider import LLMProvider
 from app.services.model_router import get_model_router
@@ -32,15 +35,30 @@ async def create_storyboard(
     user: User = Depends(get_current_user),
     llm_client: LLMProvider = Depends(get_llm_client),
 ):
+    characters = [get_owned_character(db, cid, user) for cid in payload.character_ids]
+    world_bible = get_owned_world_bible(db, payload.world_bible_id, user) if payload.world_bible_id else None
+    guidance = " ".join(filter(None, [character_guidance(characters), world_guidance(world_bible)]))
+
     model = get_model_router().select(db, "TEXT").base_model
     try:
         shots = await generate_storyboard(
-            llm_client, model, payload.script, settings.storyboard_max_shots, settings.storyboard_max_retries
+            llm_client,
+            model,
+            payload.script,
+            settings.storyboard_max_shots,
+            settings.storyboard_max_retries,
+            guidance,
         )
     except StoryboardGenerationError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
-    storyboard = Storyboard(user_id=user.id, title=payload.title or "Untitled storyboard", script=payload.script)
+    storyboard = Storyboard(
+        user_id=user.id,
+        title=payload.title or "Untitled storyboard",
+        script=payload.script,
+        character_ids=[str(cid) for cid in payload.character_ids],
+        world_bible_id=payload.world_bible_id,
+    )
     db.add(storyboard)
     db.flush()  # assigns storyboard.id without committing yet, so shots can reference it
 

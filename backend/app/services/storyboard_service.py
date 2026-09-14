@@ -41,9 +41,14 @@ class _ShotListResponse(BaseModel):
 
 
 async def generate_storyboard(
-    llm_client, model: str, script: str, max_shots: int, max_retries: int
+    llm_client, model: str, script: str, max_shots: int, max_retries: int, guidance: str = ""
 ) -> list[StoryboardShotCreate]:
+    """`guidance` is consistency guidance from character_service.character_guidance/
+    world_guidance, appended to the system prompt — the same prompt-injection mechanism
+    creative_service.brand_guidance uses for Vector, not a new protocol."""
     system_prompt = _SYSTEM_PROMPT.format(max_shots=max_shots)
+    if guidance:
+        system_prompt = f"{system_prompt}\n\n{guidance}"
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": script},

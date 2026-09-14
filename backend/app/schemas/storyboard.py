@@ -7,6 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field
 class StoryboardGenerateRequest(BaseModel):
     title: str | None = None
     script: str
+    character_ids: list[uuid.UUID] = []
+    world_bible_id: uuid.UUID | None = None
 
 
 class StoryboardShotCreate(BaseModel):
@@ -52,6 +54,8 @@ class StoryboardRead(BaseModel):
     id: uuid.UUID
     title: str
     script: str
+    character_ids: list[uuid.UUID]
+    world_bible_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
 

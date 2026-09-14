@@ -34,6 +34,8 @@ from app.db.models.video import Video
 from app.db.models.video_generation_job import VideoGenerationJob
 from app.db.models.storyboard import Storyboard
 from app.db.models.storyboard_shot import StoryboardShot
+from app.db.models.character import Character
+from app.db.models.world_bible import WorldBible
 
 __all__ = [
     "User",
@@ -72,4 +74,6 @@ __all__ = [
     "VideoGenerationJob",
     "Storyboard",
     "StoryboardShot",
+    "Character",
+    "WorldBible",
 ]
