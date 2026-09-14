@@ -74,6 +74,15 @@ class Settings(BaseSettings):
     image_gen_max_width: int = 768
     image_gen_max_height: int = 768
 
+    # --- Image editing (inpaint / outpaint / background removal) ---
+    # No turbo-distilled inpainting model is as established as sd-turbo is for generation,
+    # so this is honestly slower than image_gen_model on CPU — see imagegen/README.md.
+    image_edit_model: str = "runwayml/stable-diffusion-inpainting"
+    image_edit_default_steps: int = 20
+    image_edit_max_steps: int = 30
+    image_edit_max_outpaint_padding: int = 256
+    image_edit_bg_removal_model: str = "u2net"
+
     # --- Sandbox (code execution, ADMIN-only) ---
     # This runs submitted code as a plain OS subprocess, not a container — no filesystem
     # jail, no network isolation, no memory/CPU cap beyond the timeout. See

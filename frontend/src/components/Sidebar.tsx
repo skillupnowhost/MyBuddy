@@ -62,6 +62,12 @@ export default function Sidebar({
           🎨 Image
         </Link>
         <Link
+          href="/image-edit"
+          className="block w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
+        >
+          🩹 Image Edit
+        </Link>
+        <Link
           href="/finetune"
           className="block w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
         >

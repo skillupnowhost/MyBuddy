@@ -57,3 +57,38 @@ python scripts/generate.py \
   --storage-dir ../backend/data \
   --database-url postgresql+psycopg://mybuddy:change_me@localhost:5432/mybuddy
 ```
+
+## Image editing (`scripts/edit_image.py`)
+
+A second script in this same venv — inpainting, outpainting, and background removal.
+Reads its source image (and, for inpaint, a mask image) from the `images` table by id,
+writes its result the same way `generate.py` does, and points the job's `result_image_id`
+at it. `GET /api/v1/images/{id}` (built for Vision, reused by `generate.py` too) serves all
+of it back with zero backend changes.
+
+- **Mask convention** (inpaint): **white = regenerate this area, black = keep the original
+  pixels** — the standard `diffusers` inpainting convention. The frontend's mask-painting
+  canvas paints in white for exactly this reason.
+- **Outpaint** needs no user-drawn mask: the script pads the canvas by the requested
+  top/bottom/left/right amount, pastes the original image at the correct offset, and
+  generates the white/black mask itself (white over the new padding, black over the
+  original), then reuses the same inpainting pipeline.
+- **Background removal** uses `rembg` (CPU-only `onnxruntime`, not the diffusion stack) —
+  it downloads a small onnx model (`u2net` by default, `IMAGE_EDIT_BG_REMOVAL_MODEL`) to a
+  local cache on first use. **This is comparatively fast even on CPU** — unlike inpaint/
+  outpaint, which go through the same slow, non-distilled diffusion pipeline as any other
+  Stable Diffusion inpainting checkpoint (`IMAGE_EDIT_MODEL`, default
+  `runwayml/stable-diffusion-inpainting` — there's no turbo-distilled inpainting model as
+  established as `sd-turbo` is for generation, so expect this to be noticeably slower than
+  `scripts/generate.py`'s default text-to-image path).
+
+```bash
+python scripts/edit_image.py \
+  --job-id <existing-image-edit-job-uuid> \
+  --user-id <user-uuid> \
+  --operation inpaint \
+  --source-image-id <image-uuid> --mask-image-id <image-uuid> \
+  --prompt "a red bicycle" --steps 20 \
+  --storage-dir ../backend/data \
+  --database-url postgresql+psycopg://mybuddy:change_me@localhost:5432/mybuddy
+```

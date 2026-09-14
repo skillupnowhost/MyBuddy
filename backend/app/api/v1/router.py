@@ -7,6 +7,7 @@ from app.api.v1.endpoints import (
     code,
     conversations,
     documents,
+    image_edit,
     image_generation,
     images,
     memories,
@@ -26,3 +27,4 @@ api_router.include_router(admin.router)
 api_router.include_router(code.router)
 api_router.include_router(images.router)
 api_router.include_router(image_generation.router)
+api_router.include_router(image_edit.router)

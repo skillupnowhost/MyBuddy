@@ -2,7 +2,7 @@
 
 Your private, self-hosted AI companion. Open-source, no paid inference API required.
 
-This build covers **Phases 1-5, 7, and 8** end to end: real local LLM chat, RAG, long-term memory, opt-in tool calling, fine-tuning infrastructure, an admin dashboard, MyBuddy Code (code chat, code RAG over uploaded projects, an in-browser editor, and admin-only sandboxed execution), and MyBuddy Vision (attach images to any chat message for a vision-capable local model to answer about). **Phases 6 and 9** (a from-scratch research model, and MyBuddy Image text-to-image generation) have real, correct, syntax-verified code that hasn't been executed end-to-end on this particular dev machine (no GPU, and for Phase 9 no `imagegen/.venv` provisioned) — see `research/README.md` and `imagegen/README.md` for why. See [Roadmap](#roadmap) for the phase-by-phase breakdown.
+This build covers **Phases 1-5, 7, and 8** end to end: real local LLM chat, RAG, long-term memory, opt-in tool calling, fine-tuning infrastructure, an admin dashboard, MyBuddy Code (code chat, code RAG over uploaded projects, an in-browser editor, and admin-only sandboxed execution), and MyBuddy Vision (attach images to any chat message for a vision-capable local model to answer about). **Phases 6, 9, and 10** (a from-scratch research model, MyBuddy Image text-to-image generation, and MyBuddy Image Edit) have real, correct, syntax-verified code that hasn't been executed end-to-end on this particular dev machine (no GPU, and for Phases 9-10 no `imagegen/.venv` provisioned) — see `research/README.md` and `imagegen/README.md` for why. See [Roadmap](#roadmap) for the phase-by-phase breakdown.
 
 ## Architecture
 
@@ -190,6 +190,16 @@ Default model is `stabilityai/sd-turbo` (`IMAGE_GEN_MODEL`), chosen specifically
 
 **Hardware reality check** (same honest standard as Fine-tuning): if `imagegen/.venv` isn't set up (`cd imagegen && python -m venv .venv && pip install -r requirements.txt`), the backend falls back to its own interpreter, and a real job correctly goes `PENDING → RUNNING → FAILED` with a clear "install image generation dependencies" message rather than pretending to generate anything. This project's primary dev machine has no GPU, so even with `imagegen/.venv` provisioned, expect real generation to take real time (well over a minute per image) — see `imagegen/README.md`.
 
+## MyBuddy Image Edit (Phase 10)
+
+Inpainting, outpainting, and background removal from `/image-edit`. Runs as a **second script** in the same `imagegen/` subprocess venv Phase 9 already set up (`imagegen/scripts/edit_image.py`), not a new top-level directory — it reads its source image (and, for inpainting, a mask) from the `images` table by id and writes its result the same way `generate.py` does, so `GET /api/v1/images/{id}` serves everything back with zero backend changes.
+
+- **Inpaint**: paint over the area to regenerate in the browser (a small `<canvas>`-based mask painter, `MaskCanvas.tsx` — no new npm dependency) and describe what should appear there. Mask convention: **white = regenerate, black = keep** (the standard `diffusers` convention).
+- **Outpaint**: extend the canvas in any direction by a pixel amount; the padding mask is generated automatically (white over the new area, black over the original) — no manual painting needed — then reuses the same inpainting pipeline.
+- **Remove background**: no prompt or mask needed. Uses `rembg` (CPU-only `onnxruntime`, not the diffusion stack) and is comparatively fast even without a GPU — unlike inpaint/outpaint, which are real diffusion passes.
+
+**Hardware reality check** (same honest standard as Fine-tuning/Image generation): `IMAGE_EDIT_MODEL` defaults to `runwayml/stable-diffusion-inpainting`, a standard (non-distilled) SD1.5 inpainting checkpoint — there's no turbo-style inpainting model as established as `sd-turbo` is for text-to-image, so inpaint/outpaint are honestly slower than Phase 9's generation path on CPU. If `imagegen/.venv` isn't set up, a real job correctly goes `PENDING → RUNNING → FAILED` with a clear "install image editing dependencies" message.
+
 ## Research track (Phase 6)
 
 `research/` contains a from-scratch, from-random-initialization transformer (RoPE, causal attention, RMSNorm, SwiGLU) and a training loop — real, correct code, syntax-verified, but not executed live here (same hardware reasoning as fine-tuning, see `research/README.md`). This is a separate, educational scaffold from both the main app and the fine-tuning pipeline.
@@ -200,7 +210,7 @@ Default model is `stabilityai/sd-turbo` (`IMAGE_GEN_MODEL`), chosen specifically
 - JWT access tokens (short-lived) + refresh tokens; every conversation/chat/model/document/memory/dataset/training/admin route requires a valid access token, and admin routes additionally require the `ADMIN` role.
 - CORS restricted to `FRONTEND_ORIGIN`.
 - Auth endpoints rate-limited.
-- Every user-owned row (conversations, messages, documents, chunks, memories, datasets, training jobs, code projects, sandbox executions, images, image generation jobs) is scoped to `user_id` in every query — no cross-user access, verified by automated tests including deliberate cross-user access attempts.
+- Every user-owned row (conversations, messages, documents, chunks, memories, datasets, training jobs, code projects, sandbox executions, images, image generation jobs, image edit jobs) is scoped to `user_id` in every query — no cross-user access, verified by automated tests including deliberate cross-user access attempts.
 - Uploaded files are stored under a randomized filename (never the client-supplied name), namespaced by user id, outside any web-served path; content-type and size are validated before anything touches disk.
 - The calculator tool uses an AST-based restricted evaluator, never Python's `eval()` — arbitrary code execution is not reachable through it.
 - Code execution (`/code`'s "Run" button) IS arbitrary code execution, deliberately, and is gated to `ADMIN` accounts only — see "Sandbox execution" under MyBuddy Code above for exactly what its subprocess-based isolation does and does not protect against.
@@ -221,8 +231,9 @@ Default model is `stabilityai/sd-turbo` (`IMAGE_GEN_MODEL`), chosen specifically
 | 7 | MyBuddy Code — code chat, code RAG (zip projects), CodeMirror editor, admin-only subprocess sandbox execution | Done, verified live |
 | 8 | MyBuddy Vision — attach images to chat, auto vision-model switch per turn | Done, verified via test suite (see note below) |
 | 9 | MyBuddy Image — text-to-image generation as a separate process, reuses Vision's image storage | Code complete, syntax-verified; fails correctly without a GPU/`imagegen/.venv` |
+| 10 | MyBuddy Image Edit — inpaint/outpaint/background removal, a second script in the same `imagegen/` venv | Code complete, syntax-verified; fails correctly without a GPU/`imagegen/.venv` |
 
-Each phase's abstractions (`LLMProvider`, `EmbeddingProvider`, `VectorStoreProvider`, `Tool`, `CodeVectorStoreProvider`, `SandboxProvider`) mean later work rarely touches earlier code — e.g. tools were added without changing how RAG or memory work, Code was added without changing how document RAG or fine-tuning work, Vision needed no `LLMProvider` signature change at all (just a richer message-dict shape it already passed through unmodified), and Image reused Vision's `images` table/endpoint outright instead of building a second image-storage mechanism.
+Each phase's abstractions (`LLMProvider`, `EmbeddingProvider`, `VectorStoreProvider`, `Tool`, `CodeVectorStoreProvider`, `SandboxProvider`) mean later work rarely touches earlier code — e.g. tools were added without changing how RAG or memory work, Code was added without changing how document RAG or fine-tuning work, Vision needed no `LLMProvider` signature change at all (just a richer message-dict shape it already passed through unmodified), Image reused Vision's `images` table/endpoint outright instead of building a second image-storage mechanism, and Image Edit reused both Image's `imagegen/` subprocess convention and the same `images` table outright instead of building a third.
 
 ## License
 

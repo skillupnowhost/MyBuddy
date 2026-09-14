@@ -181,6 +181,25 @@ export interface ImageGenerationJobItem {
   completed_at: string | null;
 }
 
+export type ImageEditOperation = "INPAINT" | "OUTPAINT" | "REMOVE_BACKGROUND";
+export type ImageEditJobStatus = "PENDING" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
+
+export interface ImageEditJobItem {
+  id: string;
+  operation: ImageEditOperation;
+  source_image_id: string | null;
+  mask_image_id: string | null;
+  prompt: string | null;
+  negative_prompt: string | null;
+  steps: number | null;
+  params: Record<string, number>;
+  status: ImageEditJobStatus;
+  result_image_id: string | null;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
 export interface SystemHealth {
   cpu_percent: number;
   ram_used_gb: number;

@@ -18,3 +18,7 @@ safetensors==0.4.5
 pillow==11.0.0
 sqlalchemy==2.0.36
 psycopg[binary]==3.2.3
+
+# Background removal (edit_image.py) — CPU-only onnxruntime, no conflict with the torch/
+# diffusers stack above. Downloads a small onnx model to a local cache on first use.
+rembg==2.0.61
