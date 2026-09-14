@@ -29,6 +29,7 @@ from app.db.models.max_mode_candidate import MaxModeCandidate
 from app.db.models.arena_comparison_result import ArenaComparisonResult
 from app.db.models.expert_pipeline_step import ExpertPipelineStep
 from app.db.models.workspace import Workspace
+from app.db.models.agent_step import AgentStep
 
 __all__ = [
     "User",
@@ -62,4 +63,5 @@ __all__ = [
     "ArenaComparisonResult",
     "ExpertPipelineStep",
     "Workspace",
+    "AgentStep",
 ]

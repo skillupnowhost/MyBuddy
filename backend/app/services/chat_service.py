@@ -7,6 +7,7 @@ from collections.abc import AsyncGenerator, Callable
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.db.models.agent_step import AgentStep
 from app.db.models.conversation import Conversation
 from app.db.models.expert_pipeline_step import ExpertPipelineStep
 from app.db.models.image import Image
@@ -14,6 +15,7 @@ from app.db.models.max_mode_candidate import MaxModeCandidate
 from app.db.models.message import Message
 from app.db.models.model_registry import RegisteredModel
 from app.db.models.usage_log import UsageLog
+from app.services.agent_service import AgentStepResult, run_agent_loop
 from app.services.code_rag_service import build_code_rag_prompt, retrieve_code_context
 from app.services.code_vector_store import CodeVectorStoreProvider
 from app.services.embedding_provider import EmbeddingProvider
@@ -27,7 +29,7 @@ from app.services.max_mode_service import (
 from app.services.memory_service import extract_and_save_memories, get_memory_context
 from app.services.model_router import get_model_router
 from app.services.rag_service import build_rag_prompt, retrieve_context
-from app.services.tools import get_tools_system_prompt, maybe_run_tool_call
+from app.services.tools import ToolContext, get_tools_system_prompt, maybe_run_tool_call
 from app.services.vector_store import VectorStoreProvider
 
 settings = get_settings()
@@ -40,7 +42,7 @@ def _history_for_ollama(conversation: Conversation, memory_context: str | None) 
         system_parts.append(conversation.system_prompt)
     if memory_context:
         system_parts.append(memory_context)
-    if conversation.tools_enabled:
+    if conversation.tools_enabled or conversation.agent_mode_enabled:
         system_parts.append(get_tools_system_prompt())
     if system_parts:
         history.append({"role": "system", "content": "\n\n".join(system_parts)})
@@ -130,17 +132,21 @@ async def stream_assistant_reply(
         capability = "CODE" if conversation.code_project_id else "TEXT"
         max_mode_candidates: list[RegisteredModel] = []
         expert_pipeline_active = False
+        agent_mode_active = False
         if attached_images:
             # A pinned conversation.model can't see images (most local models aren't
             # vision-capable) — vision must override the pin, same as before this router
-            # existed, not just apply when nothing is pinned. Neither MAX mode nor the
-            # Expert Pipeline cover image turns for v1 (fan-out/sub-agent cost doubles per
-            # image, no vision-agent story yet) — always falls back to the single VISION
-            # model here.
+            # existed, not just apply when nothing is pinned. None of MAX mode, the Expert
+            # Pipeline, or Agent mode cover image turns for v1 (fan-out/sub-agent/tool-loop
+            # cost doubles per image, no vision-agent story yet) — always falls back to the
+            # single VISION model here.
             model = get_model_router().select(db, "VISION").base_model
         elif conversation.expert_pipeline_enabled:
             expert_pipeline_active = True
             model = None  # resolved after generation, to the planner/synthesizer model
+        elif conversation.agent_mode_enabled:
+            agent_mode_active = True
+            model = get_model_router().select(db, capability).base_model
         else:
             if conversation.max_mode_enabled:
                 max_mode_candidates = get_max_mode_candidates(db, capability)
@@ -205,11 +211,12 @@ async def stream_assistant_reply(
         full_reply = ""
         max_mode_results: list[MaxModeCandidateResult] = []
         expert_pipeline_steps: list[ExpertStepResult] = []
+        agent_steps: list[AgentStepResult] = []
         try:
             if expert_pipeline_active:
                 try:
                     full_reply, expert_pipeline_steps = await run_expert_pipeline(
-                        db, llm_client, user_content, conversation.tools_enabled
+                        db, llm_client, user_content, conversation.tools_enabled, conversation.user_id
                     )
                 except ExpertPipelineError as exc:
                     yield f"data: {json.dumps({'error': str(exc)})}\n\n"
@@ -222,6 +229,12 @@ async def stream_assistant_reply(
                     )
                     for chunk in _chunk_text(full_reply):
                         yield f"data: {json.dumps({'delta': chunk})}\n\n"
+            elif agent_mode_active:
+                full_reply, agent_steps = await run_agent_loop(db, llm_client, model, history, conversation.user_id)
+                if agent_steps:
+                    yield f"data: {json.dumps({'agent_tools_used': [s.tool_name for s in agent_steps]})}\n\n"
+                for chunk in _chunk_text(full_reply):
+                    yield f"data: {json.dumps({'delta': chunk})}\n\n"
             elif len(max_mode_candidates) >= 2:
                 full_reply, max_mode_results = await generate_max_mode_reply(llm_client, history, max_mode_candidates)
                 model = max_mode_results[-1].model.base_model  # the judge, for usage/memory attribution
@@ -238,7 +251,9 @@ async def stream_assistant_reply(
                     yield f"data: {json.dumps({'delta': delta})}\n\n"
 
                 if conversation.tools_enabled:
-                    tool_result = await maybe_run_tool_call(full_reply)
+                    tool_result = await maybe_run_tool_call(
+                        full_reply, ToolContext(db=db, user_id=conversation.user_id)
+                    )
                     if tool_result is not None:
                         yield f"data: {json.dumps({'tool_call': tool_result.tool_name})}\n\n"
                         history.append({"role": "assistant", "content": full_reply})
@@ -280,6 +295,20 @@ async def stream_assistant_reply(
                                 is_judge=r.is_judge,
                             )
                             for r in max_mode_results
+                        ]
+                    )
+                    db.commit()
+                elif agent_steps:
+                    db.add_all(
+                        [
+                            AgentStep(
+                                message_id=assistant_message.id,
+                                step_index=i,
+                                assistant_reply=s.assistant_reply,
+                                tool_name=s.tool_name,
+                                tool_result=s.tool_result,
+                            )
+                            for i, s in enumerate(agent_steps)
                         ]
                     )
                     db.commit()

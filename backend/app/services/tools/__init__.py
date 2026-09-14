@@ -1,11 +1,16 @@
 import json
 import re
 
-from app.services.tools.base import Tool, ToolCallResult
+from app.services.tools.base import Tool, ToolCallResult, ToolContext
 from app.services.tools.calculator import CalculatorTool
 from app.services.tools.datetime_tool import CurrentDateTimeTool
+from app.services.tools.read_code_file import ReadCodeFileTool
+from app.services.tools.search_memories import SearchMemoriesTool
 
-TOOL_REGISTRY: dict[str, Tool] = {tool.name: tool for tool in [CalculatorTool(), CurrentDateTimeTool()]}
+TOOL_REGISTRY: dict[str, Tool] = {
+    tool.name: tool
+    for tool in [CalculatorTool(), CurrentDateTimeTool(), ReadCodeFileTool(), SearchMemoriesTool()]
+}
 
 _TOOL_CALL_PATTERN = re.compile(r"```tool\s*\n(.*?)\n```", re.DOTALL)
 
@@ -23,7 +28,7 @@ def get_tools_system_prompt() -> str:
     )
 
 
-async def maybe_run_tool_call(assistant_reply: str) -> ToolCallResult | None:
+async def maybe_run_tool_call(assistant_reply: str, context: ToolContext | None = None) -> ToolCallResult | None:
     match = _TOOL_CALL_PATTERN.search(assistant_reply)
     if not match:
         return None
@@ -39,5 +44,5 @@ async def maybe_run_tool_call(assistant_reply: str) -> ToolCallResult | None:
     if tool is None:
         return ToolCallResult(tool_name=tool_name, result=f"Error: unknown tool '{tool_name}'")
 
-    result = tool.run(args)
+    result = tool.run(args, context)
     return ToolCallResult(tool_name=tool_name, result=result)

@@ -15,6 +15,7 @@ honest choice here, not a missing optimization.
 """
 import json
 import re
+import uuid
 from dataclasses import dataclass
 
 from pydantic import BaseModel, ValidationError
@@ -22,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.services.llm_provider import LLMProvider
 from app.services.model_router import get_model_router
-from app.services.tools import get_tools_system_prompt, maybe_run_tool_call
+from app.services.tools import ToolContext, get_tools_system_prompt, maybe_run_tool_call
 
 VALID_STEP_TYPES = ("REASONING", "CODING", "TOOL")
 
@@ -118,7 +119,9 @@ async def _generate_plan(
     )
 
 
-async def _execute_step(db: Session, llm_client: LLMProvider, step: PlanStep, tools_enabled: bool) -> tuple[str, str]:
+async def _execute_step(
+    db: Session, llm_client: LLMProvider, step: PlanStep, tools_enabled: bool, user_id: uuid.UUID
+) -> tuple[str, str]:
     if step.step_type == "CODING":
         model = get_model_router().select(db, "CODE").base_model
     else:
@@ -130,7 +133,7 @@ async def _execute_step(db: Session, llm_client: LLMProvider, step: PlanStep, to
             {"role": "user", "content": step.instruction},
         ]
         reply = await llm_client.chat(model, messages)
-        tool_result = await maybe_run_tool_call(reply)
+        tool_result = await maybe_run_tool_call(reply, ToolContext(db=db, user_id=user_id))
         if tool_result is not None:
             reply = f"{reply}\n[Tool result: {tool_result.result}]"
         return model, reply
@@ -171,6 +174,7 @@ async def run_expert_pipeline(
     llm_client: LLMProvider,
     user_content: str,
     tools_enabled: bool,
+    user_id: uuid.UUID,
     max_steps: int = 5,
     max_retries: int = 1,
 ) -> tuple[str, list[ExpertStepResult]]:
@@ -179,7 +183,7 @@ async def run_expert_pipeline(
 
     steps: list[ExpertStepResult] = []
     for plan_step in plan.steps:
-        model, raw_output = await _execute_step(db, llm_client, plan_step, tools_enabled)
+        model, raw_output = await _execute_step(db, llm_client, plan_step, tools_enabled, user_id)
         verified_output = await _verify_step(llm_client, planner_model, plan_step, raw_output)
         steps.append(ExpertStepResult(step=plan_step, model=model, raw_output=raw_output, verified_output=verified_output))
 

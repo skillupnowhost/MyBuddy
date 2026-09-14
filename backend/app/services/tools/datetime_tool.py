@@ -1,11 +1,11 @@
 from datetime import datetime, timezone
 
-from app.services.tools.base import Tool
+from app.services.tools.base import Tool, ToolContext
 
 
 class CurrentDateTimeTool(Tool):
     name = "current_datetime"
     description = "Returns the current UTC date and time. Args: {} (no arguments needed)"
 
-    def run(self, args: dict) -> str:
+    def run(self, args: dict, context: ToolContext | None = None) -> str:
         return datetime.now(timezone.utc).isoformat()

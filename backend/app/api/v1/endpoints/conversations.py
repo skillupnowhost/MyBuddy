@@ -5,12 +5,14 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.workspaces import get_owned_workspace
 from app.core.deps import get_current_user, get_db
+from app.db.models.agent_step import AgentStep
 from app.db.models.code_project import CodeProject
 from app.db.models.conversation import Conversation
 from app.db.models.expert_pipeline_step import ExpertPipelineStep
 from app.db.models.max_mode_candidate import MaxModeCandidate
 from app.db.models.message import Message
 from app.db.models.user import User
+from app.schemas.agent import AgentStepRead
 from app.schemas.arena import MaxModeCandidateRead
 from app.schemas.conversation import ConversationCreate, ConversationDetail, ConversationRead, ConversationUpdate
 from app.schemas.expert_pipeline import ExpertPipelineStepRead
@@ -42,14 +44,15 @@ def _validate_workspace(db: Session, workspace_id: uuid.UUID | None, user: User)
     get_owned_workspace(db, workspace_id, user)  # raises 404 if missing/not owned
 
 
-def _validate_reply_mode_exclusivity(max_mode_enabled: bool, expert_pipeline_enabled: bool) -> None:
-    """MAX mode and the Expert Pipeline are alternate reply strategies for the same turn
-    (see chat_service.stream_assistant_reply) — enabling both would leave it ambiguous which
-    one actually runs, so reject the combination outright rather than picking one silently."""
-    if max_mode_enabled and expert_pipeline_enabled:
+def _validate_reply_mode_exclusivity(max_mode_enabled: bool, expert_pipeline_enabled: bool, agent_mode_enabled: bool) -> None:
+    """MAX mode, the Expert Pipeline, and Agent mode are alternate reply strategies for the
+    same turn (see chat_service.stream_assistant_reply) — enabling more than one would leave
+    it ambiguous which actually runs, so reject the combination outright rather than picking
+    one silently."""
+    if sum([max_mode_enabled, expert_pipeline_enabled, agent_mode_enabled]) > 1:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="max_mode_enabled and expert_pipeline_enabled cannot both be true",
+            detail="only one of max_mode_enabled, expert_pipeline_enabled, agent_mode_enabled may be true",
         )
 
 
@@ -74,7 +77,7 @@ def create_conversation(
 ):
     _validate_code_project(db, payload.code_project_id, user)
     _validate_workspace(db, payload.workspace_id, user)
-    _validate_reply_mode_exclusivity(payload.max_mode_enabled, payload.expert_pipeline_enabled)
+    _validate_reply_mode_exclusivity(payload.max_mode_enabled, payload.expert_pipeline_enabled, payload.agent_mode_enabled)
     conversation = Conversation(
         user_id=user.id,
         title=payload.title or "New conversation",
@@ -84,6 +87,7 @@ def create_conversation(
         tools_enabled=payload.tools_enabled,
         max_mode_enabled=payload.max_mode_enabled,
         expert_pipeline_enabled=payload.expert_pipeline_enabled,
+        agent_mode_enabled=payload.agent_mode_enabled,
         code_project_id=payload.code_project_id,
         workspace_id=payload.workspace_id,
     )
@@ -117,7 +121,8 @@ def update_conversation(
         _validate_workspace(db, updates["workspace_id"], user)
     resulting_max_mode = updates.get("max_mode_enabled", conversation.max_mode_enabled)
     resulting_expert_pipeline = updates.get("expert_pipeline_enabled", conversation.expert_pipeline_enabled)
-    _validate_reply_mode_exclusivity(resulting_max_mode, resulting_expert_pipeline)
+    resulting_agent_mode = updates.get("agent_mode_enabled", conversation.agent_mode_enabled)
+    _validate_reply_mode_exclusivity(resulting_max_mode, resulting_expert_pipeline, resulting_agent_mode)
     for field, value in updates.items():
         setattr(conversation, field, value)
     db.commit()
@@ -168,6 +173,28 @@ def get_expert_pipeline_steps_for_message(
         db.query(ExpertPipelineStep)
         .filter(ExpertPipelineStep.message_id == message_id)
         .order_by(ExpertPipelineStep.step_index.asc())
+        .all()
+    )
+
+
+@router.get("/{conversation_id}/messages/{message_id}/agent-steps", response_model=list[AgentStepRead])
+def get_agent_steps_for_message(
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Transparency view for an Agent-mode turn: every tool call the model made before its
+    final answer (see agent_service.run_agent_loop / AgentStep). Empty list for a normal
+    (non-agent, or agent-with-no-tool-calls) message, not an error."""
+    _get_owned_conversation(db, conversation_id, user)
+    message = db.get(Message, message_id)
+    if message is None or message.conversation_id != conversation_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
+    return (
+        db.query(AgentStep)
+        .filter(AgentStep.message_id == message_id)
+        .order_by(AgentStep.step_index.asc())
         .all()
     )
 

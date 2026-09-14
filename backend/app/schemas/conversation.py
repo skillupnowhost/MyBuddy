@@ -14,6 +14,7 @@ class ConversationCreate(BaseModel):
     tools_enabled: bool = False
     max_mode_enabled: bool = False
     expert_pipeline_enabled: bool = False
+    agent_mode_enabled: bool = False
     code_project_id: uuid.UUID | None = None
     workspace_id: uuid.UUID | None = None
 
@@ -26,6 +27,7 @@ class ConversationUpdate(BaseModel):
     tools_enabled: bool | None = None
     max_mode_enabled: bool | None = None
     expert_pipeline_enabled: bool | None = None
+    agent_mode_enabled: bool | None = None
     code_project_id: uuid.UUID | None = None
     workspace_id: uuid.UUID | None = None
 
@@ -41,6 +43,7 @@ class ConversationRead(BaseModel):
     tools_enabled: bool
     max_mode_enabled: bool
     expert_pipeline_enabled: bool
+    agent_mode_enabled: bool
     code_project_id: uuid.UUID | None
     workspace_id: uuid.UUID | None
     created_at: datetime

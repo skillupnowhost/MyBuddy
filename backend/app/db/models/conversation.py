@@ -33,6 +33,12 @@ class Conversation(Base):
     expert_pipeline_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
+    # Bounded Agent Orchestration (phase 9 sub-phase 6): lets the model call tools repeatedly
+    # (up to agent_service.MAX_AGENT_STEPS) instead of at most once per turn — see
+    # agent_service.run_agent_loop. Mutually exclusive with max_mode_enabled and
+    # expert_pipeline_enabled — same "resulting state" validation pattern in the
+    # conversations endpoint as those two.
+    agent_mode_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     # When set, chat_service retrieves from this code project instead of the general
     # document RAG store — mutually exclusive with rag_enabled for v1.
     code_project_id: Mapped[uuid.UUID | None] = mapped_column(

@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 
 from app.core.config import get_settings
@@ -64,7 +66,9 @@ async def test_run_expert_pipeline_executes_verifies_and_synthesizes(db_session)
         ]
     )
 
-    final_answer, steps = await run_expert_pipeline(db_session, mock, "do something complex", tools_enabled=False)
+    final_answer, steps = await run_expert_pipeline(
+        db_session, mock, "do something complex", tools_enabled=False, user_id=uuid.uuid4()
+    )
 
     assert final_answer == "final combined answer"
     assert len(steps) == 2
@@ -80,7 +84,7 @@ async def test_run_expert_pipeline_executes_verifies_and_synthesizes(db_session)
 async def test_run_expert_pipeline_propagates_planner_failure(db_session):
     mock = MockProvider(reply="never a valid plan")
     with pytest.raises(ExpertPipelineError):
-        await run_expert_pipeline(db_session, mock, "do something", tools_enabled=False)
+        await run_expert_pipeline(db_session, mock, "do something", tools_enabled=False, user_id=uuid.uuid4())
 
 
 # --- chat_service integration -----------------------------------------------------------------
