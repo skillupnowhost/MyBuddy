@@ -13,6 +13,7 @@ from app.db.models.code_file import CodeFile
 from app.db.models.code_chunk import CodeChunk
 from app.db.models.code_execution_job import CodeExecutionJob
 from app.db.models.image import Image
+from app.db.models.image_generation_job import ImageGenerationJob
 
 __all__ = [
     "User",
@@ -30,4 +31,5 @@ __all__ = [
     "CodeChunk",
     "CodeExecutionJob",
     "Image",
+    "ImageGenerationJob",
 ]

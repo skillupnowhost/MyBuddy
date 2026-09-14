@@ -2,7 +2,7 @@
 
 Your private, self-hosted AI companion. Open-source, no paid inference API required.
 
-This build covers **Phases 1-5, 7, and 8** end to end: real local LLM chat, RAG, long-term memory, opt-in tool calling, fine-tuning infrastructure, an admin dashboard, MyBuddy Code (code chat, code RAG over uploaded projects, an in-browser editor, and admin-only sandboxed execution), and MyBuddy Vision (attach images to any chat message for a vision-capable local model to answer about). **Phase 6** (a from-scratch research model) has real, correct, syntax-verified code in `research/` that hasn't been executed on this particular dev machine — see that directory's README for why. See [Roadmap](#roadmap) for the phase-by-phase breakdown.
+This build covers **Phases 1-5, 7, and 8** end to end: real local LLM chat, RAG, long-term memory, opt-in tool calling, fine-tuning infrastructure, an admin dashboard, MyBuddy Code (code chat, code RAG over uploaded projects, an in-browser editor, and admin-only sandboxed execution), and MyBuddy Vision (attach images to any chat message for a vision-capable local model to answer about). **Phases 6 and 9** (a from-scratch research model, and MyBuddy Image text-to-image generation) have real, correct, syntax-verified code that hasn't been executed end-to-end on this particular dev machine (no GPU, and for Phase 9 no `imagegen/.venv` provisioned) — see `research/README.md` and `imagegen/README.md` for why. See [Roadmap](#roadmap) for the phase-by-phase breakdown.
 
 ## Architecture
 
@@ -182,6 +182,14 @@ Attach one or more images (PNG/JPEG/WEBP/GIF, 10MB limit by default) to any chat
 
 Any turn that includes an image automatically uses `OLLAMA_VISION_MODEL` (default `moondream`, a small ~1.8B model consistent with this repo's low-RAM-first choices) instead of the conversation's normal model — a text-only turn in the same conversation is unaffected. For a machine with more RAM or a GPU, point `OLLAMA_VISION_MODEL` at `llava` or `llama3.2-vision` instead for stronger image understanding.
 
+## MyBuddy Image (Phase 9)
+
+Text-to-image generation from `/image`. Runs as a **separate OS process** (`imagegen/scripts/generate.py`), never inside the API, same pattern as fine-tuning: the backend launches it via `subprocess.Popen` (`app/services/image_generation_service.py`) and the script reports its own status by writing directly to the `image_generation_jobs` table via SQL. The generated PNG and its `images` row are written the exact same way MyBuddy Vision's chat-image-attachment pipeline does — `GET /api/v1/images/{id}` serves generated images back with zero changes, no second image-storage mechanism needed.
+
+Default model is `stabilityai/sd-turbo` (`IMAGE_GEN_MODEL`), chosen specifically because it needs only 1-4 inference steps instead of a standard model's 20-50 — the single biggest lever available for making CPU-only generation less impractical. Width/height/step count are capped server-side (`IMAGE_GEN_MAX_WIDTH`/`_HEIGHT`/`_STEPS`) so a request can't ask for something far slower than intended.
+
+**Hardware reality check** (same honest standard as Fine-tuning): if `imagegen/.venv` isn't set up (`cd imagegen && python -m venv .venv && pip install -r requirements.txt`), the backend falls back to its own interpreter, and a real job correctly goes `PENDING → RUNNING → FAILED` with a clear "install image generation dependencies" message rather than pretending to generate anything. This project's primary dev machine has no GPU, so even with `imagegen/.venv` provisioned, expect real generation to take real time (well over a minute per image) — see `imagegen/README.md`.
+
 ## Research track (Phase 6)
 
 `research/` contains a from-scratch, from-random-initialization transformer (RoPE, causal attention, RMSNorm, SwiGLU) and a training loop — real, correct code, syntax-verified, but not executed live here (same hardware reasoning as fine-tuning, see `research/README.md`). This is a separate, educational scaffold from both the main app and the fine-tuning pipeline.
@@ -192,7 +200,7 @@ Any turn that includes an image automatically uses `OLLAMA_VISION_MODEL` (defaul
 - JWT access tokens (short-lived) + refresh tokens; every conversation/chat/model/document/memory/dataset/training/admin route requires a valid access token, and admin routes additionally require the `ADMIN` role.
 - CORS restricted to `FRONTEND_ORIGIN`.
 - Auth endpoints rate-limited.
-- Every user-owned row (conversations, messages, documents, chunks, memories, datasets, training jobs) is scoped to `user_id` in every query — no cross-user access, verified by automated tests including deliberate cross-user access attempts.
+- Every user-owned row (conversations, messages, documents, chunks, memories, datasets, training jobs, code projects, sandbox executions, images, image generation jobs) is scoped to `user_id` in every query — no cross-user access, verified by automated tests including deliberate cross-user access attempts.
 - Uploaded files are stored under a randomized filename (never the client-supplied name), namespaced by user id, outside any web-served path; content-type and size are validated before anything touches disk.
 - The calculator tool uses an AST-based restricted evaluator, never Python's `eval()` — arbitrary code execution is not reachable through it.
 - Code execution (`/code`'s "Run" button) IS arbitrary code execution, deliberately, and is gated to `ADMIN` accounts only — see "Sandbox execution" under MyBuddy Code above for exactly what its subprocess-based isolation does and does not protect against.
@@ -212,8 +220,9 @@ Any turn that includes an image automatically uses `OLLAMA_VISION_MODEL` (defaul
 | 6 | Experimental custom-trained MyBuddy model (research track) | Code complete, syntax-verified, not executed on this machine |
 | 7 | MyBuddy Code — code chat, code RAG (zip projects), CodeMirror editor, admin-only subprocess sandbox execution | Done, verified live |
 | 8 | MyBuddy Vision — attach images to chat, auto vision-model switch per turn | Done, verified via test suite (see note below) |
+| 9 | MyBuddy Image — text-to-image generation as a separate process, reuses Vision's image storage | Code complete, syntax-verified; fails correctly without a GPU/`imagegen/.venv` |
 
-Each phase's abstractions (`LLMProvider`, `EmbeddingProvider`, `VectorStoreProvider`, `Tool`, `CodeVectorStoreProvider`, `SandboxProvider`) mean later work rarely touches earlier code — e.g. tools were added without changing how RAG or memory work, Code was added without changing how document RAG or fine-tuning work, and Vision needed no `LLMProvider` signature change at all — just a richer message-dict shape it already passed through unmodified.
+Each phase's abstractions (`LLMProvider`, `EmbeddingProvider`, `VectorStoreProvider`, `Tool`, `CodeVectorStoreProvider`, `SandboxProvider`) mean later work rarely touches earlier code — e.g. tools were added without changing how RAG or memory work, Code was added without changing how document RAG or fine-tuning work, Vision needed no `LLMProvider` signature change at all (just a richer message-dict shape it already passed through unmodified), and Image reused Vision's `images` table/endpoint outright instead of building a second image-storage mechanism.
 
 ## License
 

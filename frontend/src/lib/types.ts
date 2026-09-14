@@ -164,6 +164,23 @@ export interface ModelsResponse {
   vision_model: string;
 }
 
+export type ImageGenerationStatus = "PENDING" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
+
+export interface ImageGenerationJobItem {
+  id: string;
+  prompt: string;
+  negative_prompt: string | null;
+  width: number;
+  height: number;
+  steps: number;
+  seed: number | null;
+  status: ImageGenerationStatus;
+  image_id: string | null;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
 export interface SystemHealth {
   cpu_percent: number;
   ram_used_gb: number;

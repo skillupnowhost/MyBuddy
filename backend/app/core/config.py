@@ -65,6 +65,15 @@ class Settings(BaseSettings):
     max_image_size_bytes: int = 10 * 1024 * 1024  # 10MB
     allowed_image_content_types: tuple[str, ...] = ("image/png", "image/jpeg", "image/webp", "image/gif")
 
+    # --- Image generation ---
+    image_gen_model: str = "stabilityai/sd-turbo"
+    image_gen_default_steps: int = 4
+    image_gen_max_steps: int = 20
+    image_gen_default_width: int = 512
+    image_gen_default_height: int = 512
+    image_gen_max_width: int = 768
+    image_gen_max_height: int = 768
+
     # --- Sandbox (code execution, ADMIN-only) ---
     # This runs submitted code as a plain OS subprocess, not a container — no filesystem
     # jail, no network isolation, no memory/CPU cap beyond the timeout. See
