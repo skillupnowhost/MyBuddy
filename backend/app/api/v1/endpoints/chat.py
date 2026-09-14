@@ -10,6 +10,7 @@ from app.core.deps import get_current_user, get_db, get_session_factory
 from app.db.models.user import User
 from app.schemas.message import MessageCreate, MessageRead
 from app.services.chat_service import stream_assistant_reply
+from app.services.code_vector_store import CodeVectorStoreProvider, get_code_vector_store
 from app.services.embedding_provider import EmbeddingProvider, get_embedding_provider
 from app.services.llm_client import get_llm_client
 from app.services.llm_provider import LLMProvider
@@ -38,9 +39,16 @@ async def send_message(
     session_factory: Callable[[], Session] = Depends(get_session_factory),
     embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
     vector_store: VectorStoreProvider = Depends(get_vector_store),
+    code_vector_store: CodeVectorStoreProvider = Depends(get_code_vector_store),
 ):
     conversation = _get_owned_conversation(db, conversation_id, user)
     generator = stream_assistant_reply(
-        conversation.id, payload.content, llm_client, session_factory, embedding_provider, vector_store
+        conversation.id,
+        payload.content,
+        llm_client,
+        session_factory,
+        embedding_provider,
+        vector_store,
+        code_vector_store,
     )
     return StreamingResponse(generator, media_type="text/event-stream")

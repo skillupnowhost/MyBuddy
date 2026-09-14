@@ -5,6 +5,7 @@ export interface Conversation {
   model: string | null;
   rag_enabled: boolean;
   tools_enabled: boolean;
+  code_project_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -12,6 +13,7 @@ export interface Conversation {
 export interface Source {
   filename: string;
   page_number: number | null;
+  lines?: string | null;
 }
 
 export interface Message {
@@ -105,6 +107,52 @@ export interface AdminStats {
   total_documents: number;
   total_memories: number;
   total_training_jobs: number;
+}
+
+export type CodeProjectStatus = "UPLOADING" | "EXTRACTING" | "EMBEDDING" | "READY" | "FAILED";
+
+export interface CodeProjectItem {
+  id: string;
+  name: string;
+  status: CodeProjectStatus;
+  file_count: number;
+  total_size_bytes: number;
+  error_message: string | null;
+  created_at: string;
+}
+
+export interface CodeFileItem {
+  id: string;
+  relative_path: string;
+  language: string | null;
+  size_bytes: number;
+}
+
+export interface CodeFileContentItem extends CodeFileItem {
+  content: string;
+}
+
+export type CodeExecutionStatus = "PENDING" | "RUNNING" | "COMPLETED" | "FAILED" | "TIMEOUT" | "CANCELLED";
+
+export interface CodeExecutionItem {
+  id: string;
+  language: string;
+  status: CodeExecutionStatus;
+  stdout: string | null;
+  stderr: string | null;
+  exit_code: number | null;
+  stdout_truncated: boolean;
+  stderr_truncated: boolean;
+  duration_ms: number | null;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface ModelsResponse {
+  models: string[];
+  default_model: string;
+  code_model: string;
 }
 
 export interface SystemHealth {

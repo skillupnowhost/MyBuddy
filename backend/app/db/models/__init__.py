@@ -8,6 +8,10 @@ from app.db.models.usage_log import UsageLog
 from app.db.models.dataset import Dataset
 from app.db.models.training_job import TrainingJob
 from app.db.models.model_registry import RegisteredModel
+from app.db.models.code_project import CodeProject
+from app.db.models.code_file import CodeFile
+from app.db.models.code_chunk import CodeChunk
+from app.db.models.code_execution_job import CodeExecutionJob
 
 __all__ = [
     "User",
@@ -20,4 +24,8 @@ __all__ = [
     "Dataset",
     "TrainingJob",
     "RegisteredModel",
+    "CodeProject",
+    "CodeFile",
+    "CodeChunk",
+    "CodeExecutionJob",
 ]

@@ -50,6 +50,12 @@ export default function Sidebar({
           🧠 Memory
         </button>
         <Link
+          href="/code"
+          className="block w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
+        >
+          💻 Code
+        </Link>
+        <Link
           href="/finetune"
           className="block w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
         >

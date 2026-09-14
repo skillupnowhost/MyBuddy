@@ -2,7 +2,7 @@
 
 Your private, self-hosted AI companion. Open-source, no paid inference API required.
 
-This build covers **Phases 1-5** end to end: real local LLM chat, RAG, long-term memory, opt-in tool calling, fine-tuning infrastructure, and an admin dashboard. **Phase 6** (a from-scratch research model) has real, correct, syntax-verified code in `research/` that hasn't been executed on this particular dev machine — see that directory's README for why. See [Roadmap](#roadmap) for the phase-by-phase breakdown.
+This build covers **Phases 1-5 and 7** end to end: real local LLM chat, RAG, long-term memory, opt-in tool calling, fine-tuning infrastructure, an admin dashboard, and MyBuddy Code (code chat, code RAG over uploaded projects, an in-browser editor, and admin-only sandboxed execution). **Phase 6** (a from-scratch research model) has real, correct, syntax-verified code in `research/` that hasn't been executed on this particular dev machine — see that directory's README for why. See [Roadmap](#roadmap) for the phase-by-phase breakdown.
 
 ## Architecture
 
@@ -157,6 +157,23 @@ Role-based (`USER`/`ADMIN`). Set `ADMIN_EMAILS` (comma-separated) before registe
 
 Upload a `.jsonl` instruction dataset from `/finetune` (validated on upload — each line needs a `user` and `assistant` message); start a LoRA fine-tuning job against any Hugging Face base model id. Training always runs as a **separate OS process** (`training/scripts/train_lora.py`), never inside the API — verified live: a real job on this machine correctly went `PENDING → RUNNING → FAILED` with the message *"Training dependencies not installed... Run 'pip install -r training/requirements.txt'"*, because this dev machine has no GPU/torch installed. That's the correct, honest outcome, not a bug — see `training/README.md`. Completed jobs auto-register a model as `EXPERIMENTAL`; admins promote it through `CANARY → STAGING → PRODUCTION` (or `ARCHIVED`/`REJECTED`) from `/finetune`.
 
+## MyBuddy Code (Phase 7)
+
+Available from the "💻 Code" link. Three parts:
+
+- **Code chat** — a conversation set to `OLLAMA_CODE_MODEL` (default `qwen2.5-coder:1.5b`, pulled at startup the same way `OLLAMA_MODEL`/`OLLAMA_EMBEDDING_MODEL` are) with a coding-focused system prompt. No new provider class needed — it's the same `OllamaProvider`, just a different model string, same as any other conversation.
+- **Code RAG** — upload a whole project as a `.zip` (25MB limit by default). It's extracted in the background with guards against zip bombs (per-file size cap, compression-ratio cap, total-extracted-size cap, entry-count cap) and path traversal (destination paths are always rebuilt from sanitized segments, never from the raw archive entry name), then chunked (same blank-line-boundary heuristic as document RAG, tracking line ranges instead of page numbers) and embedded, mirroring the Phase 2 pipeline through a parallel `CodeProject → CodeFile → CodeChunk` table hierarchy and a `CodeVectorStoreProvider`. A conversation scoped to a code project (`code_project_id`) retrieves from that project only, and is mutually exclusive with document RAG for this version. Sources cite file path + line range.
+- **Editor** — a CodeMirror pane for browsing/editing files in an uploaded project (`frontend/src/app/code/page.tsx`).
+
+### Sandbox execution — the security boundary, stated plainly
+
+The "Run" button executes code as a **plain OS subprocess, not a container** (`backend/app/services/subprocess_sandbox.py`). This is why it's restricted to **ADMIN accounts only** — it is a tool for a trusted operator to run their own snippets, not a multi-tenant-safe execution service. Concretely:
+
+- **What it does provide:** a hard wall-clock timeout (`SANDBOX_TIMEOUT_SECONDS`, default 10s) that kills the process and marks the job `TIMEOUT`; a fresh, empty temp directory per run, deleted afterward; a minimal, explicitly-built environment (never a copy of the backend's real environment) so secrets like `DATABASE_URL`/`JWT_SECRET` never reach the child process; stdout/stderr each truncated to `SANDBOX_MAX_OUTPUT_BYTES`.
+- **What it does NOT provide:** no filesystem jail (the child can read/write anything the backend's OS user can, not just its temp directory); no network isolation (the child can make outbound requests, including — in the Docker deployment — to this stack's own Postgres/Ollama containers if reachable on the same network); no memory/CPU cap beyond the wall-clock timeout; no uid/gid drop, no seccomp/AppArmor profile.
+- Only `python` is enabled by default (`SANDBOX_ALLOWED_LANGUAGES`). Set `SANDBOX_ENABLED=false` to disable the subsystem entirely.
+- The `SandboxProvider` abstraction (`backend/app/services/sandbox_provider.py`) exists so a real container/VM-backed implementation (e.g. a future `DockerSandboxProvider`) can replace `SubprocessSandboxProvider` later with zero changes to any call site — same pattern as every other provider abstraction in this codebase. Do not expose this feature to non-admin users before that replacement exists.
+
 ## Research track (Phase 6)
 
 `research/` contains a from-scratch, from-random-initialization transformer (RoPE, causal attention, RMSNorm, SwiGLU) and a training loop — real, correct code, syntax-verified, but not executed live here (same hardware reasoning as fine-tuning, see `research/README.md`). This is a separate, educational scaffold from both the main app and the fine-tuning pipeline.
@@ -170,6 +187,8 @@ Upload a `.jsonl` instruction dataset from `/finetune` (validated on upload — 
 - Every user-owned row (conversations, messages, documents, chunks, memories, datasets, training jobs) is scoped to `user_id` in every query — no cross-user access, verified by automated tests including deliberate cross-user access attempts.
 - Uploaded files are stored under a randomized filename (never the client-supplied name), namespaced by user id, outside any web-served path; content-type and size are validated before anything touches disk.
 - The calculator tool uses an AST-based restricted evaluator, never Python's `eval()` — arbitrary code execution is not reachable through it.
+- Code execution (`/code`'s "Run" button) IS arbitrary code execution, deliberately, and is gated to `ADMIN` accounts only — see "Sandbox execution" under MyBuddy Code above for exactly what its subprocess-based isolation does and does not protect against.
+- Uploaded code project zips are extracted with path-traversal and zip-bomb guards (entry-count cap, per-file size cap, compression-ratio cap, total-extracted-size cap) — destination paths are always rebuilt from sanitized segments, never from the raw archive entry name.
 - Secrets live in `.env`, never in code. `.env` is gitignored.
 
 ## Roadmap
@@ -182,8 +201,9 @@ Upload a `.jsonl` instruction dataset from `/finetune` (validated on upload — 
 | 4 | Fine-tuning (LoRA), model registry, promotion lifecycle | Done, verified live (fails correctly without a GPU/torch env) |
 | 5 | Tools, usage logging, admin dashboard, system health | Done, verified live |
 | 6 | Experimental custom-trained MyBuddy model (research track) | Code complete, syntax-verified, not executed on this machine |
+| 7 | MyBuddy Code — code chat, code RAG (zip projects), CodeMirror editor, admin-only subprocess sandbox execution | Done, verified live |
 
-Each phase's abstractions (`LLMProvider`, `EmbeddingProvider`, `VectorStoreProvider`, `Tool`) mean later work rarely touches earlier code — e.g. tools were added without changing how RAG or memory work.
+Each phase's abstractions (`LLMProvider`, `EmbeddingProvider`, `VectorStoreProvider`, `Tool`, `CodeVectorStoreProvider`, `SandboxProvider`) mean later work rarely touches earlier code — e.g. tools were added without changing how RAG or memory work, and Code was added without changing how document RAG or fine-tuning work.
 
 ## License
 

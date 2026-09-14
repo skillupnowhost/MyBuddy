@@ -58,6 +58,9 @@ def test_list_models(client):
         headers = {"Authorization": f"Bearer {token}"}
         resp = client.get("/api/v1/models", headers=headers)
         assert resp.status_code == 200
-        assert resp.json() == {"models": ["llama3.2:1b"]}
+        body = resp.json()
+        assert body["models"] == ["llama3.2:1b"]
+        assert "default_model" in body
+        assert "code_model" in body
     finally:
         app.dependency_overrides.pop(get_llm_client, None)

@@ -25,7 +25,10 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     llm_client = get_llm_client()
-    for model in (settings.ollama_model, settings.ollama_embedding_model):
+    startup_models = [settings.ollama_model, settings.ollama_embedding_model]
+    if settings.ollama_code_model and settings.ollama_code_model != settings.ollama_model:
+        startup_models.append(settings.ollama_code_model)
+    for model in startup_models:
         try:
             await llm_client.ensure_model(model)
             logger.info("Ollama model '%s' is ready", model)

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import admin, auth, chat, conversations, documents, memories, models, training
+from app.api.v1.endpoints import admin, auth, chat, code, conversations, documents, memories, models, training
 
 api_router = APIRouter()
 api_router.include_router(auth.router)
@@ -11,3 +11,4 @@ api_router.include_router(documents.router)
 api_router.include_router(memories.router)
 api_router.include_router(training.router)
 api_router.include_router(admin.router)
+api_router.include_router(code.router)

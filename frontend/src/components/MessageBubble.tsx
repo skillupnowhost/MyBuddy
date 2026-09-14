@@ -72,6 +72,7 @@ export default function MessageBubble({ message }: { message: Message }) {
               >
                 📄 {source.filename}
                 {source.page_number ? ` p.${source.page_number}` : ""}
+                {source.lines ? ` L${source.lines}` : ""}
               </span>
             ))}
           </div>

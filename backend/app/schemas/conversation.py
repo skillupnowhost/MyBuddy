@@ -12,6 +12,7 @@ class ConversationCreate(BaseModel):
     model: str | None = None
     rag_enabled: bool = False
     tools_enabled: bool = False
+    code_project_id: uuid.UUID | None = None
 
 
 class ConversationUpdate(BaseModel):
@@ -20,6 +21,7 @@ class ConversationUpdate(BaseModel):
     model: str | None = None
     rag_enabled: bool | None = None
     tools_enabled: bool | None = None
+    code_project_id: uuid.UUID | None = None
 
 
 class ConversationRead(BaseModel):
@@ -31,6 +33,7 @@ class ConversationRead(BaseModel):
     model: str | None
     rag_enabled: bool
     tools_enabled: bool
+    code_project_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
 

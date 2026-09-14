@@ -9,6 +9,8 @@ from app.core.config import get_settings
 from app.db.models.conversation import Conversation
 from app.db.models.message import Message
 from app.db.models.usage_log import UsageLog
+from app.services.code_rag_service import build_code_rag_prompt, retrieve_code_context
+from app.services.code_vector_store import CodeVectorStoreProvider
 from app.services.embedding_provider import EmbeddingProvider
 from app.services.llm_provider import LLMProvider
 from app.services.memory_service import extract_and_save_memories, get_memory_context
@@ -57,6 +59,7 @@ async def stream_assistant_reply(
     session_factory: Callable[[], Session],
     embedding_provider: EmbeddingProvider,
     vector_store: VectorStoreProvider,
+    code_vector_store: CodeVectorStoreProvider,
 ) -> AsyncGenerator[str, None]:
     """Persists the user message, streams the real model reply as SSE, then persists it.
 
@@ -80,7 +83,31 @@ async def stream_assistant_reply(
         memory_context = get_memory_context(db, conversation.user_id)
         history = _history_for_ollama(conversation, memory_context)
 
-        if conversation.rag_enabled and history:
+        if conversation.code_project_id and history:
+            # Code RAG is scoped to one open project and mutually exclusive with the
+            # general document RAG below for v1 — mixing both retrieval sources into one
+            # prompt is a v2 concern.
+            code_chunks = await retrieve_code_context(
+                db,
+                conversation.user_id,
+                conversation.code_project_id,
+                user_content,
+                embedding_provider,
+                code_vector_store,
+                settings.code_rag_top_k,
+            )
+            if code_chunks:
+                history[-1] = {"role": "user", "content": build_code_rag_prompt(user_content, code_chunks)}
+                sources = [
+                    {
+                        "filename": chunk.file.relative_path,
+                        "page_number": None,
+                        "lines": f"{chunk.start_line}-{chunk.end_line}" if chunk.start_line else None,
+                    }
+                    for chunk in code_chunks
+                ]
+                yield f"data: {json.dumps({'sources': sources})}\n\n"
+        elif conversation.rag_enabled and history:
             chunks = await retrieve_context(
                 db, conversation.user_id, user_content, embedding_provider, vector_store, settings.rag_top_k
             )
