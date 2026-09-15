@@ -10,6 +10,7 @@ from app.api.v1.endpoints import (
     code,
     conversations,
     creative,
+    director,
     documents,
     image_edit,
     image_generation,
@@ -57,4 +58,5 @@ api_router.include_router(world_bibles.router)
 api_router.include_router(camera_plans.router)
 api_router.include_router(models_3d.router)
 api_router.include_router(model_3d_generation.router)
+api_router.include_router(director.router)
 api_router.include_router(workspaces.router)
