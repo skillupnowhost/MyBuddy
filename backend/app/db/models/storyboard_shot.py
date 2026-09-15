@@ -36,6 +36,12 @@ class StoryboardShot(Base):
     sound: Mapped[str | None] = mapped_column(Text, nullable=True)
     vfx: Mapped[str | None] = mapped_column(Text, nullable=True)
     generation_prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    # Set once a video has actually been generated for this shot (see
+    # storyboard.generate_shot_video) — SET NULL rather than CASCADE so deleting the job
+    # history doesn't silently delete the shot it came from.
+    video_generation_job_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("video_generation_jobs.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     storyboard: Mapped["Storyboard"] = relationship(back_populates="shots")

@@ -13,7 +13,10 @@ from app.schemas.camera_plan import CameraPlanCreate, CameraPlanPatch, CameraPla
 router = APIRouter(prefix="/camera-plans", tags=["camera-plans"])
 
 
-def _get_owned_camera_plan(db: Session, camera_plan_id: uuid.UUID, user: User) -> CameraPlan:
+def get_owned_camera_plan(db: Session, camera_plan_id: uuid.UUID, user: User) -> CameraPlan:
+    """Exported for other endpoints (storyboard, to validate a camera_plan_id before using
+    it to enrich a shot's generation prompt) — same convention as get_owned_character/
+    get_owned_world_bible/get_owned_workspace."""
     plan = db.get(CameraPlan, camera_plan_id)
     if plan is None or plan.user_id != user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Camera plan not found")
@@ -53,7 +56,7 @@ def list_camera_plans(db: Session = Depends(get_db), user: User = Depends(get_cu
 
 @router.get("/{camera_plan_id}", response_model=CameraPlanRead)
 def get_camera_plan(camera_plan_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    return _get_owned_camera_plan(db, camera_plan_id, user)
+    return get_owned_camera_plan(db, camera_plan_id, user)
 
 
 @router.patch("/{camera_plan_id}", response_model=CameraPlanRead)
@@ -63,7 +66,7 @@ def update_camera_plan(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    plan = _get_owned_camera_plan(db, camera_plan_id, user)
+    plan = get_owned_camera_plan(db, camera_plan_id, user)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(plan, field, value)
     db.commit()
@@ -75,6 +78,6 @@ def update_camera_plan(
 def delete_camera_plan(
     camera_plan_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)
 ):
-    plan = _get_owned_camera_plan(db, camera_plan_id, user)
+    plan = get_owned_camera_plan(db, camera_plan_id, user)
     db.delete(plan)
     db.commit()

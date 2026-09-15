@@ -3,6 +3,10 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.config import get_settings
+
+settings = get_settings()
+
 
 class StoryboardGenerateRequest(BaseModel):
     title: str | None = None
@@ -45,6 +49,7 @@ class StoryboardShotRead(BaseModel):
     sound: str | None
     vfx: str | None
     generation_prompt: str
+    video_generation_job_id: uuid.UUID | None
     created_at: datetime
 
 
@@ -62,3 +67,12 @@ class StoryboardRead(BaseModel):
 
 class StoryboardDetail(StoryboardRead):
     shots: list[StoryboardShotRead] = []
+
+
+class ShotVideoGenerateRequest(BaseModel):
+    camera_plan_id: uuid.UUID | None = None
+    width: int = settings.video_gen_default_width
+    height: int = settings.video_gen_default_height
+    num_frames: int = settings.video_gen_default_num_frames
+    steps: int = settings.video_gen_default_steps
+    seed: int | None = None
