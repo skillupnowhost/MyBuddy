@@ -6,10 +6,12 @@ directory — same reasoning as imagegen/scripts/edit_image.py not importing gen
 subprocess script is self-contained and independently runnable. Talks to Postgres only to
 report its own status and to record the result video, via plain SQL, not the backend's ORM.
 
-Two operations, two very different hardware stories:
-- REMOVE_BACKGROUND uses rembg (CPU-fast, no GPU dependency) — the one video-track
-  operation in this repo that actually completes on CPU-only hardware, given video/.venv is
-  provisioned (imageio + rembg, no torch/diffusers needed for this path).
+Three operations, two very different hardware stories:
+- REMOVE_BACKGROUND and REPLACE_ENVIRONMENT both use rembg (CPU-fast, no GPU dependency) —
+  the video-track operations in this repo that actually complete on CPU-only hardware, given
+  video/.venv is provisioned (imageio + rembg, no torch/diffusers needed for this path).
+  REPLACE_ENVIRONMENT is the same per-frame segmentation composited onto a provided
+  background image instead of a solid color (spec §23).
 - REMOVE_OBJECT reuses the SD inpainting pipeline (same as imagegen/edit_image.py's INPAINT),
   applied identically to every frame with one static mask — GPU-heavy, same hardware caveat
   as generate.py. There is no per-frame mask tracking: a moving object needs a moving mask,
@@ -19,6 +21,9 @@ Two operations, two very different hardware stories:
 Usage:
     python edit_video.py --job-id <uuid> --user-id <uuid> --operation REMOVE_BACKGROUND \
         --source-video-path <path> --background-color "#00b140" --bg-removal-model u2net \
+        --storage-dir <path> --database-url <url>
+    python edit_video.py --job-id <uuid> --user-id <uuid> --operation REPLACE_ENVIRONMENT \
+        --source-video-path <path> --background-image-path <path> --bg-removal-model u2net \
         --storage-dir <path> --database-url <url>
     python edit_video.py --job-id <uuid> --user-id <uuid> --operation REMOVE_OBJECT \
         --source-video-path <path> --mask-image-path <path> --prompt "empty street" \
@@ -124,6 +129,46 @@ def run_remove_background(args) -> tuple[str, int, int, float]:
     return temp_path, width, height, duration_seconds
 
 
+def run_replace_environment(args) -> tuple[str, int, int, float]:
+    """Same per-frame rembg segmentation as run_remove_background, but composites the
+    foreground cutout onto a provided background image (resized to fill the frame) instead
+    of a solid color — spec §23 AI Environment Replacement. Still CPU-fast, no GPU needed."""
+    import tempfile
+
+    import imageio
+    import numpy as np
+    from PIL import Image
+    from rembg import new_session, remove
+
+    background_source = Image.open(args.background_image_path).convert("RGB")
+    session = new_session(args.bg_removal_model)
+
+    reader = imageio.get_reader(args.source_video_path)
+    meta = reader.get_meta_data()
+    fps = meta.get("fps", 24)
+
+    fd, temp_path = tempfile.mkstemp(suffix=".mp4")
+    os.close(fd)
+    writer = imageio.get_writer(temp_path, fps=fps)
+    width = height = 0
+    frame_count = 0
+    try:
+        for frame in reader:
+            source_frame = Image.fromarray(frame).convert("RGB")
+            width, height = source_frame.size
+            cutout = remove(source_frame, session=session)  # RGBA
+            background = background_source.resize((width, height))
+            background.paste(cutout, mask=cutout.split()[3])
+            writer.append_data(np.array(background))
+            frame_count += 1
+    finally:
+        writer.close()
+        reader.close()
+
+    duration_seconds = frame_count / fps if fps else 0.0
+    return temp_path, width, height, duration_seconds
+
+
 def run_remove_object(args) -> tuple[str, int, int, float]:
     """Reads the source video frame by frame and inpaints the same static mask on every
     frame via a Stable Diffusion inpainting pipeline (same model/API as
@@ -175,9 +220,10 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--job-id", required=True)
     parser.add_argument("--user-id", required=True)
-    parser.add_argument("--operation", required=True, choices=["REMOVE_BACKGROUND", "REMOVE_OBJECT"])
+    parser.add_argument("--operation", required=True, choices=["REMOVE_BACKGROUND", "REMOVE_OBJECT", "REPLACE_ENVIRONMENT"])
     parser.add_argument("--source-video-path", required=True)
     parser.add_argument("--background-color", default="#00b140")
+    parser.add_argument("--background-image-path", default=None)
     parser.add_argument("--bg-removal-model", default="u2net")
     parser.add_argument("--mask-image-path", default=None)
     parser.add_argument("--prompt", default=None)
@@ -191,6 +237,9 @@ def main() -> int:
     if args.operation == "REMOVE_OBJECT" and (not args.mask_image_path or not args.prompt):
         print("REMOVE_OBJECT requires --mask-image-path and --prompt.", file=sys.stderr)
         return 1
+    if args.operation == "REPLACE_ENVIRONMENT" and not args.background_image_path:
+        print("REPLACE_ENVIRONMENT requires --background-image-path.", file=sys.stderr)
+        return 1
 
     engine = create_engine(args.database_url)
     update_job(engine, args.job_id, status="RUNNING")
@@ -198,6 +247,8 @@ def main() -> int:
     try:
         if args.operation == "REMOVE_OBJECT":
             temp_path, width, height, duration_seconds = run_remove_object(args)
+        elif args.operation == "REPLACE_ENVIRONMENT":
+            temp_path, width, height, duration_seconds = run_replace_environment(args)
         else:
             temp_path, width, height, duration_seconds = run_remove_background(args)
         video_id = save_result_video(engine, args.user_id, args.storage_dir, temp_path, width, height, duration_seconds)

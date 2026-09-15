@@ -27,6 +27,12 @@ def _upload_mask_image(client, headers):
     ).json()["id"]
 
 
+def _upload_image(client, headers, filename="bg.png"):
+    return client.post(
+        "/api/v1/images", headers=headers, files={"file": (filename, io.BytesIO(_PNG_BYTES), "image/png")}
+    ).json()["id"]
+
+
 # --- upload ------------------------------------------------------------------------------
 
 
@@ -213,6 +219,66 @@ def test_remove_object_rejects_other_users_mask_image(client, monkeypatch):
             "source_video_id": video["id"],
             "mask_image_id": other_mask_id,
             "prompt": "empty street",
+        },
+        headers=headers_a,
+    )
+    assert resp.status_code == 404
+
+
+# --- REPLACE_ENVIRONMENT --------------------------------------------------------------------
+
+
+def test_replace_environment_requires_background_image(client):
+    token = _register_and_login(client, "video-edit-env-missing@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    video = _upload_video(client, headers).json()
+
+    resp = client.post(
+        "/api/v1/video-edit",
+        json={"operation": "REPLACE_ENVIRONMENT", "source_video_id": video["id"]},
+        headers=headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_replace_environment_job_created_with_background_image(client, monkeypatch):
+    monkeypatch.setattr("app.api.v1.endpoints.video_edit.launch_video_edit_job", lambda *a, **k: None)
+    token = _register_and_login(client, "video-edit-env-user@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    video = _upload_video(client, headers).json()
+    background_id = _upload_image(client, headers)
+
+    resp = client.post(
+        "/api/v1/video-edit",
+        json={
+            "operation": "REPLACE_ENVIRONMENT",
+            "source_video_id": video["id"],
+            "background_image_id": background_id,
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["operation"] == "REPLACE_ENVIRONMENT"
+    assert body["background_image_id"] == background_id
+
+
+def test_replace_environment_rejects_other_users_background_image(client, monkeypatch):
+    monkeypatch.setattr("app.api.v1.endpoints.video_edit.launch_video_edit_job", lambda *a, **k: None)
+    token_a = _register_and_login(client, "video-edit-env-owner@example.com")
+    token_b = _register_and_login(client, "video-edit-env-borrower@example.com")
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+
+    video = _upload_video(client, headers_a).json()
+    other_background_id = _upload_image(client, headers_b)
+
+    resp = client.post(
+        "/api/v1/video-edit",
+        json={
+            "operation": "REPLACE_ENVIRONMENT",
+            "source_video_id": video["id"],
+            "background_image_id": other_background_id,
         },
         headers=headers_a,
     )

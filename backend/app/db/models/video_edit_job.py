@@ -8,13 +8,14 @@ from app.db.base import Base
 from app.db.types import GUID
 
 # Runs as a separate OS process (see video/scripts/edit_video.py), never inside the API
-# process — same pattern as VideoGenerationJob. REMOVE_BACKGROUND uses rembg (CPU-fast, no
-# GPU dependency) rather than diffusion, so it's the one video-track operation that actually
-# completes on this project's dev hardware. REMOVE_OBJECT reuses the same SD inpainting
-# pipeline as ImageEditJob's INPAINT, applied frame-by-frame with one static mask — same
-# GPU/CPU-hardware caveat as generation (spec §21 AI Object Removal; per-frame *tracking* of
-# a moving object/mask is explicitly out of scope for v1, see video/README.md).
-VIDEO_EDIT_OPERATIONS = ("REMOVE_BACKGROUND", "REMOVE_OBJECT")
+# process — same pattern as VideoGenerationJob. REMOVE_BACKGROUND and REPLACE_ENVIRONMENT
+# both use rembg (CPU-fast, no GPU dependency) rather than diffusion, so they're the two
+# video-track operations that actually complete on this project's dev hardware.
+# REMOVE_OBJECT reuses the same SD inpainting pipeline as ImageEditJob's INPAINT, applied
+# frame-by-frame with one static mask — same GPU/CPU-hardware caveat as generation (spec §21
+# AI Object Removal; per-frame *tracking* of a moving object/mask is explicitly out of scope
+# for v1, see video/README.md).
+VIDEO_EDIT_OPERATIONS = ("REMOVE_BACKGROUND", "REMOVE_OBJECT", "REPLACE_ENVIRONMENT")
 VIDEO_EDIT_JOB_STATUSES = ("PENDING", "RUNNING", "COMPLETED", "FAILED", "CANCELLED")
 
 
@@ -30,6 +31,12 @@ class VideoEditJob(Base):
         GUID(), ForeignKey("videos.id", ondelete="SET NULL"), nullable=True
     )
     background_color: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # REPLACE_ENVIRONMENT only: the foreground (rembg cutout, same segmentation as
+    # REMOVE_BACKGROUND) is composited onto this image instead of a solid color, resized to
+    # fill the frame.
+    background_image_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("images.id", ondelete="SET NULL"), nullable=True
+    )
     # REMOVE_OBJECT only: mask convention matches ImageEditJob's INPAINT (white = remove/
     # regenerate, black = keep), applied identically to every frame.
     mask_image_id: Mapped[uuid.UUID | None] = mapped_column(

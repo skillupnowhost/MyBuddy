@@ -24,13 +24,15 @@ def launch_video_edit_job(
     prompt: str | None = None,
     negative_prompt: str | None = None,
     steps: int | None = None,
+    background_image_path: str | None = None,
 ) -> subprocess.Popen:
     """Launches video editing as a genuinely separate OS process — same reasoning as
     video_generation_service.launch_video_generation_job. Shares video/'s venv (edit_video.py
     lives alongside generate.py, same as imagegen/'s generate.py + edit_image.py).
-    REMOVE_BACKGROUND uses rembg (CPU-fast, no GPU dependency — actually completes on this
-    project's hardware); REMOVE_OBJECT reuses the SD inpainting pipeline (GPU-heavy, same
-    caveat as generate.py) applied per-frame with mask_image_path."""
+    REMOVE_BACKGROUND and REPLACE_ENVIRONMENT use rembg (CPU-fast, no GPU dependency —
+    actually complete on this project's hardware); REMOVE_OBJECT reuses the SD inpainting
+    pipeline (GPU-heavy, same caveat as generate.py) applied per-frame with
+    mask_image_path."""
     python = str(_VIDEO_VENV_PYTHON) if _VIDEO_VENV_PYTHON.exists() else sys.executable
 
     storage_dir = os.path.abspath(settings.storage_dir)
@@ -56,6 +58,8 @@ def launch_video_edit_job(
         command += ["--negative-prompt", negative_prompt]
     if steps is not None:
         command += ["--steps", str(steps)]
+    if background_image_path:
+        command += ["--background-image-path", background_image_path]
 
     return subprocess.Popen(
         command,

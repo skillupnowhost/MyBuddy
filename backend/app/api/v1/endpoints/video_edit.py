@@ -34,11 +34,18 @@ def create_video_edit_job(
         if mask_image is None or mask_image.user_id != user.id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mask image not found")
 
+    background_image = None
+    if payload.background_image_id is not None:
+        background_image = db.get(Image, payload.background_image_id)
+        if background_image is None or background_image.user_id != user.id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Background image not found")
+
     job = VideoEditJob(
         user_id=user.id,
         operation=payload.operation,
         source_video_id=payload.source_video_id,
         background_color=payload.background_color,
+        background_image_id=payload.background_image_id,
         mask_image_id=payload.mask_image_id,
         prompt=payload.prompt,
         negative_prompt=payload.negative_prompt,
@@ -59,6 +66,7 @@ def create_video_edit_job(
             payload.prompt,
             payload.negative_prompt,
             payload.steps,
+            background_image.storage_path if background_image is not None else None,
         )
         job.pid = getattr(proc, "pid", None)
         db.commit()
