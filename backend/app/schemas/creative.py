@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.schemas.vector import VectorDocumentPurpose, _validate_color
 
-CreativeAssetType = Literal["VECTOR", "ANIMATION", "MOTION"]
+CreativeAssetType = Literal["VECTOR", "ANIMATION", "MOTION", "STORYBOARD", "VIDEO", "MODEL_3D"]
 
 
 def _validate_optional_color(v: str | None) -> str | None:

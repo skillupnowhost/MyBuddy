@@ -10,9 +10,12 @@ from app.db.models.animation_document import AnimationDocument
 from app.db.models.brand_kit import BrandKit
 from app.db.models.creative_asset import CreativeAsset
 from app.db.models.creative_project import CreativeProject
+from app.db.models.model_3d import Model3D
 from app.db.models.motion_project import MotionProject
+from app.db.models.storyboard import Storyboard
 from app.db.models.user import User
 from app.db.models.vector_document import VectorDocument
+from app.db.models.video import Video
 from app.schemas.creative import (
     BrandKitCreate,
     BrandKitPatch,
@@ -37,6 +40,12 @@ _ASSET_TYPE_MODELS = {
     "VECTOR": VectorDocument,
     "ANIMATION": AnimationDocument,
     "MOTION": MotionProject,
+    # Video/CG/VFX track assets (spec §56 Creative Director extension) — one orchestrator
+    # spanning both the original vector/illustration/animation family and the video track,
+    # not a second competing Creative Director.
+    "STORYBOARD": Storyboard,
+    "VIDEO": Video,
+    "MODEL_3D": Model3D,
 }
 
 

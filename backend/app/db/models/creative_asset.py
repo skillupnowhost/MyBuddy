@@ -11,7 +11,7 @@ from app.db.types import GUID
 # asset_type, so it's deliberately NOT a DB-level foreign key — ownership/existence is checked
 # at the application layer (api/v1/endpoints/creative.py), the standard tradeoff of a
 # polymorphic-association design.
-CREATIVE_ASSET_TYPES = ("VECTOR", "ANIMATION", "MOTION")
+CREATIVE_ASSET_TYPES = ("VECTOR", "ANIMATION", "MOTION", "STORYBOARD", "VIDEO", "MODEL_3D")
 
 
 class CreativeAsset(Base):
