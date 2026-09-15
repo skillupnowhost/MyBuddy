@@ -118,6 +118,11 @@ class Settings(BaseSettings):
     cg3d_default_steps: int = 64
     cg3d_max_steps: int = 128
     cg3d_default_guidance_scale: float = 15.0
+    # AI 3D Scene Generator (spec §13): pure LLM prompt decomposition (list of individual
+    # object prompts), not a real scene-placement engine — see
+    # scene_decomposition_service.py's docstring for why.
+    cg3d_scene_max_objects: int = 12
+    cg3d_scene_max_retries: int = 1
 
     # --- StoryboardGenerator (video/CG/VFX spec §7) ---
     # Pure LLM structured output, same fenced-block + Pydantic-validation + repair-retry

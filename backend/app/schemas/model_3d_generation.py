@@ -41,6 +41,15 @@ class Model3DGenerationRead(BaseModel):
     completed_at: datetime | None
 
 
+class SceneGenerationRequest(BaseModel):
+    description: str
+
+
+class SceneObjectRead(BaseModel):
+    label: str
+    generation_job: Model3DGenerationRead
+
+
 class Model3DRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
