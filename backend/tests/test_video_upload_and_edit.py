@@ -348,3 +348,67 @@ def test_color_grade_presets_match_between_backend_and_subprocess():
     script_presets = set(re.findall(r'"([A-Z_]+)":\s*\{', match.group(1)))
 
     assert schema_presets == script_presets
+
+
+# --- ADD_VFX -----------------------------------------------------------------------------
+
+
+def test_add_vfx_requires_vfx_type(client):
+    token = _register_and_login(client, "video-edit-vfx-missing@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    video = _upload_video(client, headers).json()
+
+    resp = client.post(
+        "/api/v1/video-edit", json={"operation": "ADD_VFX", "source_video_id": video["id"]}, headers=headers
+    )
+    assert resp.status_code == 422
+
+
+def test_add_vfx_rejects_unknown_vfx_type(client):
+    token = _register_and_login(client, "video-edit-vfx-unknown@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    video = _upload_video(client, headers).json()
+
+    resp = client.post(
+        "/api/v1/video-edit",
+        json={"operation": "ADD_VFX", "source_video_id": video["id"], "vfx_type": "LASER_BEAMS"},
+        headers=headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_add_vfx_job_created_with_vfx_type(client, monkeypatch):
+    monkeypatch.setattr("app.api.v1.endpoints.video_edit.launch_video_edit_job", lambda *a, **k: None)
+    token = _register_and_login(client, "video-edit-vfx-user@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    video = _upload_video(client, headers).json()
+
+    resp = client.post(
+        "/api/v1/video-edit",
+        json={"operation": "ADD_VFX", "source_video_id": video["id"], "vfx_type": "RAIN"},
+        headers=headers,
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["operation"] == "ADD_VFX"
+    assert body["vfx_type"] == "RAIN"
+
+
+def test_vfx_presets_match_between_backend_and_subprocess():
+    """Same guardrail pattern as test_color_grade_presets_match_between_backend_and_subprocess
+    — the VfxType Literal and _VFX_PARTICLE_PRESETS dict are deliberately duplicated across
+    the two separate Python environments."""
+    import re
+
+    from app.schemas.video_edit import VfxType
+
+    schema_presets = set(VfxType.__args__)
+
+    script_path = os.path.join(os.path.dirname(__file__), "..", "..", "video", "scripts", "edit_video.py")
+    with open(script_path, encoding="utf-8") as f:
+        script_source = f.read()
+    match = re.search(r"_VFX_PARTICLE_PRESETS = \{(.*?)\n\}", script_source, re.DOTALL)
+    assert match is not None
+    script_presets = set(re.findall(r'"([A-Z_]+)":\s*\{', match.group(1)))
+
+    assert schema_presets == script_presets

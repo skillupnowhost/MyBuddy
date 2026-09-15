@@ -17,8 +17,10 @@ from app.db.types import GUID
 # for v1, see video/README.md). COLOR_GRADE is classical per-frame color adjustment (PIL
 # ImageEnhance + a channel-based temperature shift, no ML model) — honestly labeled as
 # classical grading, not neural relighting (spec §24/§29 explicitly ask for named cinematic
-# presets/LUTs, which is how real color grading actually works).
-VIDEO_EDIT_OPERATIONS = ("REMOVE_BACKGROUND", "REMOVE_OBJECT", "REPLACE_ENVIRONMENT", "COLOR_GRADE")
+# presets/LUTs, which is how real color grading actually works). ADD_VFX is a classical
+# particle simulation (position/velocity/gravity, rendered via PIL) composited over every
+# frame — not a neural VFX generator, honestly labeled the same way as COLOR_GRADE.
+VIDEO_EDIT_OPERATIONS = ("REMOVE_BACKGROUND", "REMOVE_OBJECT", "REPLACE_ENVIRONMENT", "COLOR_GRADE", "ADD_VFX")
 VIDEO_EDIT_JOB_STATUSES = ("PENDING", "RUNNING", "COMPLETED", "FAILED", "CANCELLED")
 
 
@@ -50,6 +52,8 @@ class VideoEditJob(Base):
     steps: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # COLOR_GRADE only: one of color_grade_service.COLOR_GRADE_PRESETS.
     color_preset: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # ADD_VFX only: one of RAIN/SNOW/SPARKS (see edit_video.py's particle presets).
+    vfx_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING")
     result_video_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID(), ForeignKey("videos.id", ondelete="SET NULL"), nullable=True

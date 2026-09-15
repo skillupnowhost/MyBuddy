@@ -51,6 +51,7 @@ def create_video_edit_job(
         negative_prompt=payload.negative_prompt,
         steps=payload.steps,
         color_preset=payload.color_preset,
+        vfx_type=payload.vfx_type,
     )
     db.add(job)
     db.commit()
@@ -69,6 +70,7 @@ def create_video_edit_job(
             payload.steps,
             background_image.storage_path if background_image is not None else None,
             payload.color_preset,
+            payload.vfx_type,
         )
         job.pid = getattr(proc, "pid", None)
         db.commit()

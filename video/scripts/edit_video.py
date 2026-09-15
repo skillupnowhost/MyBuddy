@@ -290,6 +290,119 @@ def run_remove_object(args) -> tuple[str, int, int, float]:
     return temp_path, width, height, duration_seconds
 
 
+# Classical particle-simulation VFX overlays (spec §17 VFX Engine) — plain Euler physics
+# (position += velocity, velocity += gravity) rendered via PIL ImageDraw, no ML model at all.
+# Honestly labeled as classical simulation, not a neural VFX generator. Keep this dict's keys
+# in sync with backend/app/schemas/video_edit.py's VfxType literal.
+_VFX_PARTICLE_PRESETS = {
+    "RAIN": {"count": 150, "color": (200, 220, 255), "gravity": 0.0, "spawn_top": True, "fades": False},
+    "SNOW": {"count": 80, "color": (255, 255, 255), "gravity": 0.0, "spawn_top": True, "fades": False},
+    "SPARKS": {"count": 60, "color": (255, 170, 60), "gravity": 0.35, "spawn_top": False, "fades": True},
+}
+
+
+def _spawn_particle(vfx_type: str, width: int, height: int, random_module):
+    if vfx_type == "RAIN":
+        return {
+            "x": random_module.uniform(0, width),
+            "y": random_module.uniform(-height, 0),
+            "vx": random_module.uniform(-1, -3),
+            "vy": random_module.uniform(18, 28),
+            "life": None,
+        }
+    if vfx_type == "SNOW":
+        return {
+            "x": random_module.uniform(0, width),
+            "y": random_module.uniform(-height, 0),
+            "vx": random_module.uniform(-1.5, 1.5),
+            "vy": random_module.uniform(1.5, 4),
+            "life": None,
+        }
+    # SPARKS: burst upward from the bottom edge, gravity pulls them back down, fade with age.
+    max_life = random_module.randint(15, 35)
+    return {
+        "x": random_module.uniform(0, width),
+        "y": float(height),
+        "vx": random_module.uniform(-3, 3),
+        "vy": random_module.uniform(-9, -4),
+        "life": max_life,
+        "max_life": max_life,
+    }
+
+
+def run_add_vfx(args) -> tuple[str, int, int, float]:
+    """Overlays a classical particle simulation (rain/snow/sparks) on every frame — see
+    _VFX_PARTICLE_PRESETS. CPU-fast like REMOVE_BACKGROUND/COLOR_GRADE, no ML model."""
+    import random
+    import tempfile
+
+    import imageio
+    import numpy as np
+    from PIL import Image, ImageDraw
+
+    preset = _VFX_PARTICLE_PRESETS[args.vfx_type]
+
+    reader = imageio.get_reader(args.source_video_path)
+    meta = reader.get_meta_data()
+    fps = meta.get("fps", 24)
+
+    fd, temp_path = tempfile.mkstemp(suffix=".mp4")
+    os.close(fd)
+    writer = imageio.get_writer(temp_path, fps=fps)
+    width = height = 0
+    frame_count = 0
+    particles: list[dict] = []
+    try:
+        for frame in reader:
+            source_frame = Image.fromarray(frame).convert("RGB")
+            width, height = source_frame.size
+
+            if not particles:
+                particles = [_spawn_particle(args.vfx_type, width, height, random) for _ in range(preset["count"])]
+
+            overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(overlay)
+            for i, particle in enumerate(particles):
+                particle["x"] += particle["vx"]
+                particle["y"] += particle["vy"]
+                particle["vy"] += preset["gravity"]
+
+                if preset["fades"]:
+                    particle["life"] -= 1
+                    alpha = max(0, int(255 * (particle["life"] / particle["max_life"])))
+                    out_of_bounds = particle["life"] <= 0 or particle["y"] > height
+                else:
+                    alpha = 200
+                    out_of_bounds = particle["y"] > height or particle["y"] < -20 or particle["x"] < -20 or particle["x"] > width + 20
+
+                if out_of_bounds:
+                    particles[i] = _spawn_particle(args.vfx_type, width, height, random)
+                    continue
+
+                color = (*preset["color"], alpha)
+                if args.vfx_type == "RAIN":
+                    draw.line(
+                        [(particle["x"], particle["y"]), (particle["x"] + particle["vx"], particle["y"] - particle["vy"] * 0.4)],
+                        fill=color, width=1,
+                    )
+                else:
+                    radius = 2 if args.vfx_type == "SNOW" else 1.5
+                    draw.ellipse(
+                        [particle["x"] - radius, particle["y"] - radius, particle["x"] + radius, particle["y"] + radius],
+                        fill=color,
+                    )
+
+            composited = Image.alpha_composite(source_frame.convert("RGBA"), overlay).convert("RGB")
+            writer.append_data(np.array(composited))
+            frame_count += 1
+    finally:
+        writer.close()
+        reader.close()
+
+    duration_seconds = frame_count / fps if fps else 0.0
+    return temp_path, width, height, duration_seconds
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--job-id", required=True)
@@ -297,7 +410,7 @@ def main() -> int:
     parser.add_argument(
         "--operation",
         required=True,
-        choices=["REMOVE_BACKGROUND", "REMOVE_OBJECT", "REPLACE_ENVIRONMENT", "COLOR_GRADE"],
+        choices=["REMOVE_BACKGROUND", "REMOVE_OBJECT", "REPLACE_ENVIRONMENT", "COLOR_GRADE", "ADD_VFX"],
     )
     parser.add_argument("--source-video-path", required=True)
     parser.add_argument("--background-color", default="#00b140")
@@ -309,6 +422,7 @@ def main() -> int:
     parser.add_argument("--steps", type=int, default=20)
     parser.add_argument("--inpaint-model", default="runwayml/stable-diffusion-inpainting")
     parser.add_argument("--color-preset", default=None, choices=list(_COLOR_GRADE_PRESETS))
+    parser.add_argument("--vfx-type", default=None, choices=list(_VFX_PARTICLE_PRESETS))
     parser.add_argument("--storage-dir", required=True)
     parser.add_argument("--database-url", required=True)
     args = parser.parse_args()
@@ -322,6 +436,9 @@ def main() -> int:
     if args.operation == "COLOR_GRADE" and not args.color_preset:
         print("COLOR_GRADE requires --color-preset.", file=sys.stderr)
         return 1
+    if args.operation == "ADD_VFX" and not args.vfx_type:
+        print("ADD_VFX requires --vfx-type.", file=sys.stderr)
+        return 1
 
     engine = create_engine(args.database_url)
     update_job(engine, args.job_id, status="RUNNING")
@@ -333,6 +450,8 @@ def main() -> int:
             temp_path, width, height, duration_seconds = run_replace_environment(args)
         elif args.operation == "COLOR_GRADE":
             temp_path, width, height, duration_seconds = run_color_grade(args)
+        elif args.operation == "ADD_VFX":
+            temp_path, width, height, duration_seconds = run_add_vfx(args)
         else:
             temp_path, width, height, duration_seconds = run_remove_background(args)
         video_id = save_result_video(engine, args.user_id, args.storage_dir, temp_path, width, height, duration_seconds)
