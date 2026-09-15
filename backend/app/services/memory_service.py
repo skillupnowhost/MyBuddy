@@ -52,10 +52,18 @@ async def extract_and_save_memories(
         try:
             candidates = json.loads(raw.strip())
         except json.JSONDecodeError:
-            start, end = raw.find("["), raw.rfind("]")
-            if start == -1 or end == -1:
+            # The model sometimes emits trailing prose, or even a second stray JSON value,
+            # after the array we want. raw_decode parses only the first complete JSON value
+            # and ignores everything after it, unlike a find("[")/rfind("]") slice — which
+            # grabs the LAST "]" in the whole response and reproduces the exact same
+            # "Extra data" failure when a second bracketed value follows the real one.
+            start = raw.find("[")
+            if start == -1:
                 return
-            candidates = json.loads(raw[start : end + 1])
+            try:
+                candidates, _ = json.JSONDecoder().raw_decode(raw, start)
+            except json.JSONDecodeError:
+                return
 
         if not isinstance(candidates, list):
             return

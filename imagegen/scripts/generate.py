@@ -18,6 +18,15 @@ import traceback
 import uuid
 from datetime import datetime, timezone
 
+# huggingface_hub's local cache normally hard-links/symlinks each snapshot file back to a
+# shared blob store. Creating those links needs either Administrator rights or Developer Mode
+# on Windows (SeCreateSymbolicLinkPrivilege) — without it, downloads fail part-way through
+# with "[WinError 1314] A required privilege is not held by the client". Disabling symlinks
+# makes it copy the file instead, which needs no special privilege at the cost of a bit more
+# disk space. Must be set before huggingface_hub/diffusers/transformers are imported anywhere
+# in this process, so it's set here at module load time.
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS", "1")
+
 from sqlalchemy import create_engine, text
 
 
@@ -72,7 +81,23 @@ def run_generation(args) -> bytes:
     import torch
     from diffusers import AutoPipelineForText2Image
 
-    pipe = AutoPipelineForText2Image.from_pretrained(args.model, torch_dtype=torch.float32)
+    # Prefer the fp16-variant safetensors weights when a repo publishes them (smaller download,
+    # and safetensors mmaps the file instead of reading it whole into memory) even though we
+    # compute in float32 — this machine has only ~8GB RAM, and sd-turbo's fp32 .bin checkpoint
+    # (~3.2GB, read fully into memory by diffusers' legacy-checkpoint loader) was enough on its
+    # own to OOM. CPU inference in float16 itself isn't reliable (many CPU kernels don't
+    # implement Half), so we still upcast to float32 for the actual computation.
+    #
+    # Not every model publishes fp16-variant or even safetensors files at all (e.g.
+    # segmind/tiny-sd ships only plain .bin) — diffusers raises OSError for a missing
+    # repo/revision but ValueError for "no fp16-variant files", so both are caught as "fall
+    # back to whatever this repo actually has", without forcing a format it doesn't provide.
+    try:
+        pipe = AutoPipelineForText2Image.from_pretrained(
+            args.model, torch_dtype=torch.float32, variant="fp16", use_safetensors=True
+        )
+    except (OSError, ValueError):
+        pipe = AutoPipelineForText2Image.from_pretrained(args.model, torch_dtype=torch.float32)
     pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
     generator = None

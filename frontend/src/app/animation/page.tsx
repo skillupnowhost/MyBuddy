@@ -38,9 +38,9 @@ function AnimationPreview({ animationId }: { animationId: string }) {
     };
   }, [animationId]);
 
-  if (!src) return <div className="h-64 w-64 animate-pulse rounded-lg bg-white/10" />;
+  if (!src) return <div className="h-64 w-64 animate-pulse rounded-lg bg-gray-100" />;
   // eslint-disable-next-line @next/next/no-img-element -- a blob: URL can't go through next/image's loader
-  return <img src={src} alt="animation preview" className="max-w-full rounded-lg border border-white/10 bg-white" />;
+  return <img src={src} alt="animation preview" className="max-w-full rounded-lg border border-gray-200 bg-white" />;
 }
 
 export default function AnimationPage() {
@@ -119,24 +119,24 @@ export default function AnimationPage() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-[#0f1115] text-white">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+    <div className="flex h-screen flex-col bg-[#f4f5f9] text-gray-900">
+      <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
         <h1 className="text-lg font-semibold">MyBuddy Animator</h1>
-        <Link href="/chat" className="text-sm text-blue-400 hover:underline">
+        <Link href="/chat" className="text-sm text-indigo-600 hover:underline">
           &larr; Back to chat
         </Link>
       </div>
 
-      {error && <p className="border-b border-white/10 bg-red-950/30 px-4 py-2 text-sm text-red-400">{error}</p>}
+      {error && <p className="border-b border-gray-200 bg-red-50 px-4 py-2 text-sm text-red-500">{error}</p>}
 
       <div className="flex flex-1 overflow-hidden">
-        <aside className="flex w-72 shrink-0 flex-col border-r border-white/10 bg-[#12141c] p-3">
-          <label className="mb-2 block text-xs text-white/50">
+        <aside className="flex w-72 shrink-0 flex-col border-r border-gray-200 bg-white p-3">
+          <label className="mb-2 block text-xs text-gray-500">
             Source Vector document
             <select
               value={sourceDocId}
               onChange={(e) => setSourceDocId(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1.5 text-xs text-white"
+              className="mt-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-900"
             >
               {vectorDocuments.length === 0 && <option value="">No vector documents yet</option>}
               {vectorDocuments.map((d) => (
@@ -151,27 +151,27 @@ export default function AnimationPage() {
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Describe the motion: move the circle across the screen"
             rows={3}
-            className="mb-2 w-full resize-none rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500"
+            className="mb-2 w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-900 outline-none focus:border-indigo-400 focus:bg-white"
           />
-          <div className="mb-2 flex items-center gap-2 text-xs text-white/50">
+          <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
             <label className="flex items-center gap-1">
               Duration (ms)
               <input
                 type="number"
                 value={durationMs}
                 onChange={(e) => setDurationMs(Number(e.target.value))}
-                className="w-20 rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1 text-xs text-white"
+                className="w-20 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-900"
               />
             </label>
             <label className="flex items-center gap-1">
-              <input type="checkbox" checked={loop} onChange={(e) => setLoop(e.target.checked)} />
+              <input type="checkbox" checked={loop} onChange={(e) => setLoop(e.target.checked)} className="accent-indigo-600" />
               loop
             </label>
           </div>
           <button
             onClick={handleGenerate}
             disabled={!sourceDocId || !prompt.trim() || generating}
-            className="mb-4 w-full rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-40"
+            className="mb-4 w-full rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
           >
             {generating ? "Generating..." : "+ Generate animation"}
           </button>
@@ -181,7 +181,7 @@ export default function AnimationPage() {
               <div
                 key={a.id}
                 className={`group flex items-center justify-between rounded-lg px-2 py-2 text-sm ${
-                  a.id === activeAnimation?.id ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"
+                  a.id === activeAnimation?.id ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 }`}
               >
                 <button onClick={() => setActiveAnimation(a)} className="flex-1 truncate text-left text-xs">
@@ -189,14 +189,14 @@ export default function AnimationPage() {
                 </button>
                 <button
                   onClick={() => handleDeleteAnimation(a.id)}
-                  className="ml-1 opacity-0 transition group-hover:opacity-100 hover:text-red-400"
+                  className="ml-1 opacity-0 transition group-hover:opacity-100 hover:text-red-500"
                   aria-label="Delete animation"
                 >
                   &times;
                 </button>
               </div>
             ))}
-            {animations.length === 0 && <p className="py-6 text-center text-xs text-white/40">No animations yet.</p>}
+            {animations.length === 0 && <p className="py-6 text-center text-xs text-gray-400">No animations yet.</p>}
           </div>
         </aside>
 
@@ -206,14 +206,14 @@ export default function AnimationPage() {
               <AnimationPreview key={activeAnimation.id} animationId={activeAnimation.id} />
               <button
                 onClick={() => downloadAnimationDocument(activeAnimation.id, activeAnimation.title)}
-                className="rounded-lg border border-white/10 px-3 py-2 text-sm text-white/70 hover:bg-white/10 hover:text-white"
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
               >
                 Export SVG
               </button>
 
-              <div className="w-full max-w-xl overflow-x-auto rounded-lg border border-white/10">
+              <div className="w-full max-w-xl overflow-x-auto rounded-lg border border-gray-200">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-white/5 text-white/50">
+                  <thead className="bg-gray-50 text-gray-500">
                     <tr>
                       <th className="px-2 py-1">time_ms</th>
                       <th className="px-2 py-1">prop</th>
@@ -224,26 +224,26 @@ export default function AnimationPage() {
                   </thead>
                   <tbody>
                     {activeAnimation.keyframes.map((kf) => (
-                      <tr key={kf.id} className="border-t border-white/5">
+                      <tr key={kf.id} className="border-t border-gray-100">
                         <td className="px-2 py-1">
                           <input
                             type="number"
                             defaultValue={kf.time_ms}
                             onBlur={(e) => handleUpdateKeyframe(kf, "time_ms", e.target.value)}
-                            className="w-16 bg-transparent text-white"
+                            className="w-16 bg-transparent text-gray-900"
                           />
                         </td>
-                        <td className="px-2 py-1 text-white/70">{kf.prop}</td>
+                        <td className="px-2 py-1 text-gray-700">{kf.prop}</td>
                         <td className="px-2 py-1">
                           <input
                             defaultValue={String(kf.value)}
                             onBlur={(e) => handleUpdateKeyframe(kf, "value", e.target.value)}
-                            className="w-20 bg-transparent text-white"
+                            className="w-20 bg-transparent text-gray-900"
                           />
                         </td>
-                        <td className="px-2 py-1 text-white/70">{kf.easing}</td>
+                        <td className="px-2 py-1 text-gray-700">{kf.easing}</td>
                         <td className="px-2 py-1">
-                          <button onClick={() => handleDeleteKeyframe(kf)} className="text-white/40 hover:text-red-400">
+                          <button onClick={() => handleDeleteKeyframe(kf)} className="text-gray-400 hover:text-red-500">
                             &times;
                           </button>
                         </td>
@@ -251,7 +251,7 @@ export default function AnimationPage() {
                     ))}
                     {activeAnimation.keyframes.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-2 py-4 text-center text-white/40">
+                        <td colSpan={5} className="px-2 py-4 text-center text-gray-400">
                           No keyframes.
                         </td>
                       </tr>
@@ -261,7 +261,7 @@ export default function AnimationPage() {
               </div>
             </>
           ) : (
-            <p className="mt-20 text-sm text-white/40">Generate or select an animation to preview it.</p>
+            <p className="mt-20 text-sm text-gray-400">Generate or select an animation to preview it.</p>
           )}
         </main>
       </div>

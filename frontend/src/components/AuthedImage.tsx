@@ -36,7 +36,7 @@ export default function AuthedImage({
   }, [imageId]);
 
   if (!src) {
-    return <div className={`animate-pulse rounded-lg bg-white/10 ${className ?? "h-24 w-24"}`} />;
+    return <div className={`animate-pulse rounded-lg bg-gray-200 ${className ?? "h-24 w-24"}`} />;
   }
 
   // eslint-disable-next-line @next/next/no-img-element -- a blob: URL can't go through next/image's loader

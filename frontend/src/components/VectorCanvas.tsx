@@ -120,7 +120,7 @@ export default function VectorCanvas({
       width={document.canvas_width}
       height={document.canvas_height}
       viewBox={`0 0 ${document.canvas_width} ${document.canvas_height}`}
-      className="max-w-full rounded-lg border border-white/10 bg-white"
+      className="max-w-full rounded-lg border border-gray-200 bg-white"
       onClick={() => onSelect(null)}
     >
       {document.background_color && (

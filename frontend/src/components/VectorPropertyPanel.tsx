@@ -32,7 +32,7 @@ export default function VectorPropertyPanel({
   const [error, setError] = useState<string | null>(null);
 
   if (!object) {
-    return <p className="p-3 text-xs text-white/40">Select an object to edit its properties.</p>;
+    return <p className="p-3 text-xs text-gray-400">Select an object to edit its properties.</p>;
   }
 
   const editableProps = EDITABLE_PROPS_BY_TYPE[object.object_type] ?? [];
@@ -50,32 +50,32 @@ export default function VectorPropertyPanel({
 
   return (
     <div className="space-y-3 p-3">
-      <p className="text-xs font-medium text-white/70">{object.object_type}</p>
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      <p className="text-xs font-medium text-gray-700">{object.object_type}</p>
+      {error && <p className="text-xs text-red-500">{error}</p>}
       {editableProps.map((prop) => {
         const value = object.props[prop];
         if (COLOR_PROPS.has(prop)) {
           const isHex = typeof value === "string" && value.startsWith("#");
           return (
-            <label key={prop} className="flex items-center justify-between gap-2 text-xs text-white/50">
+            <label key={prop} className="flex items-center justify-between gap-2 text-xs text-gray-500">
               {prop}
               <input
                 type={isHex ? "color" : "text"}
                 defaultValue={typeof value === "string" ? value : "#000000"}
                 onBlur={(e) => commit(prop, e.target.value)}
-                className="w-24 rounded border border-white/10 bg-[#0f1115] px-1 py-0.5 text-xs text-white"
+                className="w-24 rounded border border-gray-200 bg-gray-50 px-1 py-0.5 text-xs text-gray-900"
               />
             </label>
           );
         }
         return (
-          <label key={prop} className="flex items-center justify-between gap-2 text-xs text-white/50">
+          <label key={prop} className="flex items-center justify-between gap-2 text-xs text-gray-500">
             {prop}
             <input
               type={NUMBER_PROPS.has(prop) ? "number" : "text"}
               defaultValue={String(value ?? "")}
               onBlur={(e) => commit(prop, e.target.value)}
-              className="w-24 rounded border border-white/10 bg-[#0f1115] px-2 py-1 text-xs text-white"
+              className="w-24 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-900"
             />
           </label>
         );

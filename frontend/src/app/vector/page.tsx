@@ -124,19 +124,19 @@ export default function VectorPage() {
   const selectedObject = activeDocument?.objects.find((o) => o.id === selectedId) ?? null;
 
   return (
-    <div className="flex h-screen flex-col bg-[#0f1115] text-white">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+    <div className="flex h-screen flex-col bg-[#f4f5f9] text-gray-900">
+      <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
         <h1 className="text-lg font-semibold">MyBuddy Vector</h1>
-        <Link href="/chat" className="text-sm text-blue-400 hover:underline">
+        <Link href="/chat" className="text-sm text-indigo-600 hover:underline">
           &larr; Back to chat
         </Link>
       </div>
 
-      {error && <p className="border-b border-white/10 bg-red-950/30 px-4 py-2 text-sm text-red-400">{error}</p>}
+      {error && <p className="border-b border-gray-200 bg-red-50 px-4 py-2 text-sm text-red-500">{error}</p>}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left: documents */}
-        <aside className="flex w-64 shrink-0 flex-col border-r border-white/10 bg-[#12141c]">
+        <aside className="flex w-64 shrink-0 flex-col border-r border-gray-200 bg-white">
           <div className="space-y-2 p-3">
             <textarea
               ref={promptRef}
@@ -144,12 +144,12 @@ export default function VectorPage() {
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Describe an image: a red circle next to a blue square"
               rows={3}
-              className="w-full resize-none rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500"
+              className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-900 outline-none focus:border-indigo-400 focus:bg-white"
             />
             <select
               value={purpose}
               onChange={(e) => setPurpose(e.target.value as VectorDocumentPurpose)}
-              className="w-full rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1.5 text-xs text-white"
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-900"
             >
               {PURPOSE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -160,7 +160,7 @@ export default function VectorPage() {
             <button
               onClick={handleGenerate}
               disabled={!prompt.trim() || generating}
-              className="w-full rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-40"
+              className="w-full rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
             >
               {generating ? "Generating..." : "+ New document"}
             </button>
@@ -170,7 +170,7 @@ export default function VectorPage() {
               <div
                 key={d.id}
                 className={`group flex items-center justify-between rounded-lg px-2 py-2 text-sm ${
-                  d.id === activeDocument?.id ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"
+                  d.id === activeDocument?.id ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 }`}
               >
                 <button onClick={() => handleSelectDocument(d.id)} className="flex-1 truncate text-left text-xs">
@@ -178,19 +178,19 @@ export default function VectorPage() {
                 </button>
                 <button
                   onClick={() => handleDeleteDocument(d.id)}
-                  className="ml-1 opacity-0 transition group-hover:opacity-100 hover:text-red-400"
+                  className="ml-1 opacity-0 transition group-hover:opacity-100 hover:text-red-500"
                   aria-label="Delete document"
                 >
                   &times;
                 </button>
               </div>
             ))}
-            {documents.length === 0 && <p className="py-6 text-center text-xs text-white/40">No documents yet.</p>}
+            {documents.length === 0 && <p className="py-6 text-center text-xs text-gray-400">No documents yet.</p>}
           </div>
         </aside>
 
         {/* Center: canvas + NL edit */}
-        <main className="flex flex-1 flex-col items-center overflow-auto border-r border-white/10 p-6">
+        <main className="flex flex-1 flex-col items-center overflow-auto border-r border-gray-200 p-6">
           {activeDocument ? (
             <>
               <VectorCanvas document={activeDocument} selectedId={selectedId} onSelect={setSelectedId} />
@@ -200,30 +200,30 @@ export default function VectorPage() {
                   onChange={(e) => setInstruction(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleEdit()}
                   placeholder='Natural-language edit, e.g. "make the circle red"'
-                  className="flex-1 rounded-lg border border-white/10 bg-[#161922] px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
+                  className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-indigo-400"
                 />
                 <button
                   onClick={handleEdit}
                   disabled={!instruction.trim() || editing}
-                  className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40"
+                  className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
                 >
                   {editing ? "Applying..." : "Apply"}
                 </button>
                 <button
                   onClick={handleExport}
-                  className="rounded-lg border border-white/10 px-3 py-2 text-sm text-white/70 hover:bg-white/10 hover:text-white"
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                 >
                   Export SVG
                 </button>
               </div>
             </>
           ) : (
-            <p className="mt-20 text-sm text-white/40">Generate or select a document to start editing.</p>
+            <p className="mt-20 text-sm text-gray-400">Generate or select a document to start editing.</p>
           )}
         </main>
 
         {/* Right: property panel */}
-        <aside className="w-72 shrink-0 bg-[#12141c]">
+        <aside className="w-72 shrink-0 bg-white">
           {activeDocument && (
             <VectorPropertyPanel documentId={activeDocument.id} object={selectedObject} onUpdated={handleObjectUpdated} />
           )}

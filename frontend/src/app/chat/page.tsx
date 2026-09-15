@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Image as ImageIcon, Send, Square, X } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
+import Header from "@/components/Header";
+import HomeDashboard from "@/components/HomeDashboard";
 import MessageBubble from "@/components/MessageBubble";
 import DocumentsPanel from "@/components/DocumentsPanel";
 import MemoriesPanel from "@/components/MemoriesPanel";
@@ -12,7 +15,7 @@ import { getCurrentUser } from "@/lib/admin";
 import { clearTokens, isLoggedIn } from "@/lib/auth";
 import { deleteImage, uploadImage } from "@/lib/images";
 import { streamChatMessage } from "@/lib/stream";
-import type { Conversation, ImageItem, Message } from "@/lib/types";
+import type { Conversation, CurrentUser, ImageItem, Message } from "@/lib/types";
 
 export default function ChatPage() {
   const router = useRouter();
@@ -24,14 +27,17 @@ export default function ChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [showDocuments, setShowDocuments] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [pendingImages, setPendingImages] = useState<ImageItem[]>([]);
   const [imageUploading, setImageUploading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const activeConversation = conversations.find((c) => c.id === activeId) ?? null;
+  const isAdmin = currentUser?.role === "ADMIN";
+  const showHome = !activeId && messages.length === 0;
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -40,7 +46,7 @@ export default function ChatPage() {
     }
     loadConversations();
     getCurrentUser()
-      .then((user) => setIsAdmin(user.role === "ADMIN"))
+      .then(setCurrentUser)
       .catch(() => {});
   }, [router]);
 
@@ -101,6 +107,16 @@ export default function ChatPage() {
   function handleLogout() {
     clearTokens();
     router.replace("/login");
+  }
+
+  function handleHome() {
+    setActiveId(null);
+    setMessages([]);
+  }
+
+  function handlePromptSelect(text: string) {
+    setInput(text);
+    textareaRef.current?.focus();
   }
 
   async function handleAttachImages(e: React.ChangeEvent<HTMLInputElement>) {
@@ -197,13 +213,17 @@ export default function ChatPage() {
     abortRef.current?.abort();
   }
 
+  const displayName = currentUser?.email ? currentUser.email.split("@")[0].replace(/[._-]/g, " ") : "there";
+
   return (
-    <div className="flex h-screen bg-[#0f1115]">
+    <div className="flex h-screen bg-[#f4f5f9]">
       <Sidebar
         conversations={conversations}
         activeId={activeId}
+        userEmail={currentUser?.email ?? null}
         onSelect={selectConversation}
         onNew={handleNewConversation}
+        onHome={handleHome}
         onDelete={handleDeleteConversation}
         onLogout={handleLogout}
         onOpenDocuments={() => setShowDocuments(true)}
@@ -214,15 +234,19 @@ export default function ChatPage() {
       {showDocuments && <DocumentsPanel onClose={() => setShowDocuments(false)} />}
       {showMemory && <MemoriesPanel onClose={() => setShowMemory(false)} />}
 
-      <main className="flex flex-1 flex-col">
-        <div className="flex-1 overflow-y-auto px-4 py-6">
-          {messages.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center text-white/40">
-              <h2 className="mb-2 text-xl font-medium text-white/70">Meet MyBuddy</h2>
-              <p className="text-sm">Your private, self-hosted AI companion. Ask me anything.</p>
-            </div>
+      <main className="flex flex-1 flex-col overflow-hidden">
+        <Header userEmail={currentUser?.email ?? null} onLogout={handleLogout} />
+
+        <div className="thin-scroll flex-1 overflow-y-auto">
+          {showHome ? (
+            <HomeDashboard
+              displayName={displayName}
+              isAdmin={isAdmin}
+              onPromptSelect={handlePromptSelect}
+              onOpenDocuments={() => setShowDocuments(true)}
+            />
           ) : (
-            <div className="mx-auto flex max-w-3xl flex-col gap-4">
+            <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6">
               {messages.map((m) => (
                 <MessageBubble key={m.id} message={m} />
               ))}
@@ -231,27 +255,27 @@ export default function ChatPage() {
           )}
         </div>
 
-        {error && <p className="mx-auto mb-2 max-w-3xl text-sm text-red-400">{error}</p>}
+        {error && <p className="mx-auto mb-2 max-w-3xl text-sm text-red-500">{error}</p>}
 
-        <div className="border-t border-white/10 p-4">
+        <div className="border-t border-gray-200 bg-white p-4">
           <div className="mx-auto flex max-w-3xl flex-col gap-2">
             {activeConversation && (
               <div className="flex flex-wrap gap-4">
-                <label className="flex w-fit items-center gap-2 text-xs text-white/50">
+                <label className="flex w-fit items-center gap-2 text-xs text-gray-500">
                   <input
                     type="checkbox"
                     checked={activeConversation.rag_enabled}
                     onChange={() => handleToggleFlag("rag_enabled")}
-                    className="accent-blue-600"
+                    className="accent-indigo-600"
                   />
                   Use my documents (RAG)
                 </label>
-                <label className="flex w-fit items-center gap-2 text-xs text-white/50">
+                <label className="flex w-fit items-center gap-2 text-xs text-gray-500">
                   <input
                     type="checkbox"
                     checked={activeConversation.tools_enabled}
                     onChange={() => handleToggleFlag("tools_enabled")}
-                    className="accent-blue-600"
+                    className="accent-indigo-600"
                   />
                   Allow tools (calculator, date/time)
                 </label>
@@ -264,10 +288,10 @@ export default function ChatPage() {
                     <AuthedImage imageId={img.id} className="h-16 w-16 rounded-lg object-cover" />
                     <button
                       onClick={() => handleRemovePendingImage(img.id)}
-                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/80 text-xs text-white/80 hover:bg-red-600"
+                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/80 text-white/80 hover:bg-red-600"
                       aria-label="Remove image"
                     >
-                      &times;
+                      <X className="h-3 w-3" strokeWidth={2.5} />
                     </button>
                   </div>
                 ))}
@@ -286,11 +310,12 @@ export default function ChatPage() {
                 onClick={() => imageInputRef.current?.click()}
                 disabled={imageUploading}
                 title="Attach image(s) for MyBuddy Vision"
-                className="rounded-xl border border-white/10 px-3 py-3 text-sm text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-40"
+                className="group rounded-xl border border-gray-200 px-3 py-3 text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 disabled:opacity-40"
               >
-                🖼️
+                <ImageIcon className="h-4 w-4 transition-transform duration-200 group-hover:scale-110" strokeWidth={2} />
               </button>
               <textarea
+                ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -301,22 +326,24 @@ export default function ChatPage() {
                 }}
                 placeholder="Message MyBuddy..."
                 rows={1}
-                className="max-h-40 flex-1 resize-none rounded-xl border border-white/10 bg-[#161922] px-4 py-3 text-sm text-white outline-none focus:border-blue-500"
+                className="max-h-40 flex-1 resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none focus:border-indigo-400 focus:bg-white"
               />
               {isStreaming ? (
                 <button
                   onClick={handleStop}
-                  className="rounded-xl bg-red-600 px-4 py-3 text-sm font-medium text-white hover:bg-red-500"
+                  className="flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-3 text-sm font-medium text-white hover:bg-red-500"
                 >
+                  <Square className="h-3.5 w-3.5" fill="currentColor" strokeWidth={0} />
                   Stop
                 </button>
               ) : (
                 <button
                   onClick={handleSend}
                   disabled={!input.trim()}
-                  className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40"
+                  className="group flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
                 >
                   Send
+                  <Send className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" strokeWidth={2} />
                 </button>
               )}
             </div>

@@ -11,11 +11,11 @@ import { getImageBlobUrl, uploadImage } from "@/lib/images";
 import type { ImageEditJobItem, ImageEditOperation, ImageItem } from "@/lib/types";
 
 const STATUS_COLORS: Record<string, string> = {
-  PENDING: "text-white/50",
-  RUNNING: "text-amber-400",
-  COMPLETED: "text-emerald-400",
-  FAILED: "text-red-400",
-  CANCELLED: "text-white/40",
+  PENDING: "text-gray-500",
+  RUNNING: "text-amber-500",
+  COMPLETED: "text-emerald-600",
+  FAILED: "text-red-500",
+  CANCELLED: "text-gray-400",
 };
 
 const TERMINAL_STATUSES = new Set(["COMPLETED", "FAILED", "CANCELLED"]);
@@ -131,27 +131,27 @@ export default function ImageEditPage() {
       (operation === "OUTPAINT" && prompt.trim().length > 0 && (padTop || padBottom || padLeft || padRight) > 0));
 
   return (
-    <div className="min-h-screen bg-[#0f1115] px-6 py-8 text-white">
+    <div className="min-h-screen bg-[#f4f5f9] px-6 py-8 text-gray-900">
       <div className="mx-auto max-w-3xl">
         <div className="mb-2 flex items-center justify-between">
           <h1 className="text-2xl font-semibold">MyBuddy Image Edit</h1>
-          <Link href="/chat" className="text-sm text-blue-400 hover:underline">
+          <Link href="/chat" className="text-sm text-indigo-600 hover:underline">
             &larr; Back to chat
           </Link>
         </div>
-        <p className="mb-6 text-sm text-white/40">
+        <p className="mb-6 text-sm text-gray-400">
           Runs as a separate process (see <code>imagegen/README.md</code>). Background removal is fast even on
           CPU; inpaint/outpaint go through a full diffusion pipeline and are much slower without a GPU.
         </p>
 
-        {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
+        {error && <p className="mb-4 text-sm text-red-500">{error}</p>}
 
-        <section className="mb-8 rounded-xl border border-white/10 bg-[#161922] p-4">
-          <h2 className="mb-3 text-sm font-medium text-white/70">1. Upload a source image</h2>
+        <section className="mb-8 rounded-xl border border-gray-200 bg-white p-4">
+          <h2 className="mb-3 text-sm font-medium text-gray-700">1. Upload a source image</h2>
           <input ref={sourceInputRef} type="file" accept="image/*" onChange={handleUploadSource} className="hidden" />
           <button
             onClick={() => sourceInputRef.current?.click()}
-            className="mb-3 w-full rounded-lg border border-dashed border-white/20 py-2 text-sm text-white/70 hover:border-blue-500 hover:text-white"
+            className="mb-3 w-full rounded-lg border border-dashed border-gray-300 py-2 text-sm text-gray-500 hover:border-indigo-400 hover:text-gray-900"
           >
             {sourceImage ? "Replace image" : "+ Upload an image"}
           </button>
@@ -164,7 +164,7 @@ export default function ImageEditPage() {
                     key={op}
                     onClick={() => setOperation(op)}
                     className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
-                      operation === op ? "bg-blue-600 text-white" : "bg-white/5 text-white/60 hover:bg-white/10"
+                      operation === op ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                     }`}
                   >
                     {op === "INPAINT" ? "Inpaint" : op === "OUTPAINT" ? "Outpaint" : "Remove background"}
@@ -174,12 +174,12 @@ export default function ImageEditPage() {
 
               {operation === "INPAINT" && sourceBlobUrl && (
                 <div className="mb-3">
-                  <p className="mb-2 text-xs text-white/50">
+                  <p className="mb-2 text-xs text-gray-500">
                     Paint over the area you want MyBuddy to regenerate.
                   </p>
                   <MaskCanvas ref={maskRef} imageBlobUrl={sourceBlobUrl} brushSize={brushSize} />
                   <div className="mt-2 flex items-center gap-3">
-                    <label className="flex items-center gap-2 text-xs text-white/50">
+                    <label className="flex items-center gap-2 text-xs text-gray-500">
                       Brush size
                       <input
                         type="range"
@@ -191,7 +191,7 @@ export default function ImageEditPage() {
                     </label>
                     <button
                       onClick={() => maskRef.current?.clear()}
-                      className="text-xs text-white/40 hover:text-white"
+                      className="text-xs text-gray-400 hover:text-gray-900"
                     >
                       Clear mask
                     </button>
@@ -206,21 +206,21 @@ export default function ImageEditPage() {
                     onChange={(e) => setPrompt(e.target.value)}
                     placeholder="Prompt"
                     rows={2}
-                    className="mb-2 w-full resize-none rounded-lg border border-white/10 bg-[#0f1115] px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
+                    className="mb-2 w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-indigo-400 focus:bg-white"
                   />
                   <input
                     value={negativePrompt}
                     onChange={(e) => setNegativePrompt(e.target.value)}
                     placeholder="Negative prompt (optional)"
-                    className="mb-2 w-full rounded-lg border border-white/10 bg-[#0f1115] px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
+                    className="mb-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-indigo-400 focus:bg-white"
                   />
-                  <label className="mb-3 flex w-fit items-center gap-2 text-xs text-white/50">
+                  <label className="mb-3 flex w-fit items-center gap-2 text-xs text-gray-500">
                     Steps
                     <input
                       type="number"
                       value={steps}
                       onChange={(e) => setSteps(Number(e.target.value))}
-                      className="w-16 rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1 text-sm text-white"
+                      className="w-16 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-900"
                     />
                   </label>
                 </>
@@ -236,13 +236,13 @@ export default function ImageEditPage() {
                       ["Right", padRight, setPadRight],
                     ] as [string, number, (n: number) => void][]
                   ).map(([label, value, setValue]) => (
-                    <label key={label} className="flex items-center gap-2 text-xs text-white/50">
+                    <label key={label} className="flex items-center gap-2 text-xs text-gray-500">
                       {label}
                       <input
                         type="number"
                         value={value}
                         onChange={(e) => setValue(Number(e.target.value))}
-                        className="w-16 rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1 text-sm text-white"
+                        className="w-16 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-900"
                       />
                     </label>
                   ))}
@@ -252,7 +252,7 @@ export default function ImageEditPage() {
               <button
                 onClick={handleSubmit}
                 disabled={!canSubmit}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40"
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
               >
                 {submitting ? "Starting..." : "Run"}
               </button>
@@ -260,30 +260,30 @@ export default function ImageEditPage() {
           )}
         </section>
 
-        <section className="rounded-xl border border-white/10 bg-[#161922] p-4">
-          <h2 className="mb-3 text-sm font-medium text-white/70">Your edits</h2>
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <h2 className="mb-3 text-sm font-medium text-gray-700">Your edits</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             {jobs.map((job) => (
-              <div key={job.id} className="rounded-lg border border-white/10 p-2">
+              <div key={job.id} className="rounded-lg border border-gray-200 p-2">
                 {job.result_image_id ? (
                   <AuthedImage imageId={job.result_image_id} className="mb-2 h-32 w-full rounded-lg object-cover" />
                 ) : (
-                  <div className="mb-2 flex h-32 w-full items-center justify-center rounded-lg bg-white/5 text-xs text-white/30">
+                  <div className="mb-2 flex h-32 w-full items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-400">
                     {job.status === "FAILED" ? "failed" : "working..."}
                   </div>
                 )}
-                <p className="truncate text-xs text-white/70">{job.operation}</p>
+                <p className="truncate text-xs text-gray-700">{job.operation}</p>
                 <div className="mt-1 flex items-center justify-between">
                   <span className={`text-xs ${STATUS_COLORS[job.status]}`}>{job.status}</span>
                 </div>
                 {job.error_message && (
-                  <p className="mt-1 truncate text-xs text-red-400/80" title={job.error_message}>
+                  <p className="mt-1 truncate text-xs text-red-500/80" title={job.error_message}>
                     {job.error_message}
                   </p>
                 )}
               </div>
             ))}
-            {jobs.length === 0 && <p className="col-span-full py-6 text-center text-sm text-white/40">No edits yet.</p>}
+            {jobs.length === 0 && <p className="col-span-full py-6 text-center text-sm text-gray-400">No edits yet.</p>}
           </div>
         </section>
       </div>

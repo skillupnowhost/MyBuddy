@@ -50,5 +50,9 @@ export async function apiJson<T>(path: string, options: RequestInit = {}): Promi
     const detail = await resp.text();
     throw new ApiError(detail || resp.statusText, resp.status);
   }
-  return resp.json();
+  // A 204 (e.g. DELETE) or other empty-body response has nothing for .json() to parse —
+  // calling it unconditionally throws "Unexpected end of JSON input" and aborts the caller
+  // before it can update state, even though the request itself succeeded.
+  const text = await resp.text();
+  return text ? (JSON.parse(text) as T) : (undefined as T);
 }

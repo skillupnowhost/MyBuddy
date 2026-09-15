@@ -66,8 +66,15 @@ class Settings(BaseSettings):
     allowed_image_content_types: tuple[str, ...] = ("image/png", "image/jpeg", "image/webp", "image/gif")
 
     # --- Image generation ---
-    image_gen_model: str = "stabilityai/sd-turbo"
-    image_gen_default_steps: int = 4
+    # sd-turbo's UNet (3.46GB, no fp16 variant published for it) doesn't fit this project's
+    # primary dev machine: only ~8GB RAM and, more critically, disk space tight enough that
+    # Windows can't grow the pagefile to back the mmap ("paging file is too small" / OS error
+    # 1455). tiny-sd's UNet has roughly a third the parameters and ships an fp16 variant, so
+    # its footprint is small enough to load. It isn't step-distilled like sd-turbo though, so
+    # it needs a real step count and standard guidance — see generate.py's guidance_scale
+    # branch (keyed on "turbo" appearing in the model name).
+    image_gen_model: str = "segmind/tiny-sd"
+    image_gen_default_steps: int = 20
     image_gen_max_steps: int = 20
     image_gen_default_width: int = 512
     image_gen_default_height: int = 512

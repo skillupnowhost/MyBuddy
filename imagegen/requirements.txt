@@ -10,15 +10,18 @@
 # image even with the fast, few-step model this project defaults to (IMAGE_GEN_MODEL) —
 # that's a hardware limit, not a bug.
 
-torch==2.5.1
+torch==2.6.0
 diffusers==0.31.0
 transformers==4.47.1
 accelerate==1.2.1
-safetensors==0.4.5
+safetensors==0.5.3
 pillow==11.0.0
 sqlalchemy==2.0.36
 psycopg[binary]==3.2.3
 
 # Background removal (edit_image.py) — CPU-only onnxruntime, no conflict with the torch/
 # diffusers stack above. Downloads a small onnx model to a local cache on first use.
-rembg==2.0.61
+# onnxruntime isn't pulled in by rembg itself (it's an optional backend), so it's listed
+# explicitly here.
+rembg==2.0.62
+onnxruntime==1.30.0

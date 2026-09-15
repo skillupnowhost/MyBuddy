@@ -57,9 +57,9 @@ function AssetPreview({ exportUrl }: { exportUrl: string }) {
     };
   }, [exportUrl]);
 
-  if (!src) return <div className="h-24 w-24 animate-pulse rounded-lg bg-white/10" />;
+  if (!src) return <div className="h-24 w-24 animate-pulse rounded-lg bg-gray-100" />;
   // eslint-disable-next-line @next/next/no-img-element -- a blob: URL can't go through next/image's loader
-  return <img src={src} alt="asset preview" className="h-24 w-24 rounded-lg border border-white/10 bg-white object-contain" />;
+  return <img src={src} alt="asset preview" className="h-24 w-24 rounded-lg border border-gray-200 bg-white object-contain" />;
 }
 
 const PURPOSE_OPTIONS: { value: VectorDocumentPurpose; label: string }[] = [
@@ -195,25 +195,25 @@ export default function CreativePage() {
     attachType === "VECTOR" ? vectorDocs : attachType === "ANIMATION" ? animations : motionProjects;
 
   return (
-    <div className="flex h-screen flex-col bg-[#0f1115] text-white">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+    <div className="flex h-screen flex-col bg-[#f4f5f9] text-gray-900">
+      <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
         <h1 className="text-lg font-semibold">MyBuddy Creative Director</h1>
-        <Link href="/chat" className="text-sm text-blue-400 hover:underline">
+        <Link href="/chat" className="text-sm text-indigo-600 hover:underline">
           &larr; Back to chat
         </Link>
       </div>
 
-      {error && <p className="border-b border-white/10 bg-red-950/30 px-4 py-2 text-sm text-red-400">{error}</p>}
+      {error && <p className="border-b border-gray-200 bg-red-50 px-4 py-2 text-sm text-red-500">{error}</p>}
 
       <div className="flex flex-1 overflow-hidden">
-        <aside className="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-r border-white/10 bg-[#12141c] p-3">
+        <aside className="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-r border-gray-200 bg-white p-3">
           <section>
-            <h2 className="mb-2 text-xs font-medium text-white/50">Brand kits</h2>
+            <h2 className="mb-2 text-xs font-medium text-gray-500">Brand kits</h2>
             <input
               value={kitName}
               onChange={(e) => setKitName(e.target.value)}
               placeholder="Brand kit name"
-              className="mb-1 w-full rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1 text-xs text-white"
+              className="mb-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-900"
             />
             <div className="mb-1 flex gap-1">
               <input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="h-7 w-full" />
@@ -224,19 +224,19 @@ export default function CreativePage() {
               value={fontFamily}
               onChange={(e) => setFontFamily(e.target.value)}
               placeholder="Font family (reference only)"
-              className="mb-1 w-full rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1 text-xs text-white"
+              className="mb-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-900"
             />
             <button
               onClick={handleCreateBrandKit}
               disabled={!kitName.trim()}
-              className="mb-2 w-full rounded-lg bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-40"
+              className="mb-2 w-full rounded-lg bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
             >
               + Add brand kit
             </button>
             {brandKits.map((k) => (
-              <div key={k.id} className="mb-1 flex items-center justify-between rounded-lg px-2 py-1 text-xs text-white/70 hover:bg-white/5">
+              <div key={k.id} className="mb-1 flex items-center justify-between rounded-lg px-2 py-1 text-xs text-gray-700 hover:bg-gray-100">
                 <span className="truncate">{k.name}</span>
-                <button onClick={() => handleDeleteBrandKit(k.id)} className="text-white/40 hover:text-red-400">
+                <button onClick={() => handleDeleteBrandKit(k.id)} className="text-gray-400 hover:text-red-500">
                   &times;
                 </button>
               </div>
@@ -244,17 +244,17 @@ export default function CreativePage() {
           </section>
 
           <section>
-            <h2 className="mb-2 text-xs font-medium text-white/50">Projects</h2>
+            <h2 className="mb-2 text-xs font-medium text-gray-500">Projects</h2>
             <input
               value={projectTitle}
               onChange={(e) => setProjectTitle(e.target.value)}
               placeholder="Project title"
-              className="mb-1 w-full rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1 text-xs text-white"
+              className="mb-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-900"
             />
             <select
               value={selectedBrandKitId}
               onChange={(e) => setSelectedBrandKitId(e.target.value)}
-              className="mb-1 w-full rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1 text-xs text-white"
+              className="mb-1 w-full rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-900"
             >
               <option value="">No brand kit</option>
               {brandKits.map((k) => (
@@ -266,7 +266,7 @@ export default function CreativePage() {
             <button
               onClick={handleCreateProject}
               disabled={!projectTitle.trim()}
-              className="mb-2 w-full rounded-lg bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-40"
+              className="mb-2 w-full rounded-lg bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
             >
               + New project
             </button>
@@ -274,13 +274,13 @@ export default function CreativePage() {
               <div
                 key={p.id}
                 className={`mb-1 flex items-center justify-between rounded-lg px-2 py-1 text-xs ${
-                  p.id === activeProject?.id ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/5"
+                  p.id === activeProject?.id ? "bg-gray-100 text-gray-900" : "text-gray-700 hover:bg-gray-100"
                 }`}
               >
                 <button onClick={() => setActiveProject(p)} className="flex-1 truncate text-left">
                   {p.title}
                 </button>
-                <button onClick={() => handleDeleteProject(p.id)} className="text-white/40 hover:text-red-400">
+                <button onClick={() => handleDeleteProject(p.id)} className="text-gray-400 hover:text-red-500">
                   &times;
                 </button>
               </div>
@@ -291,20 +291,20 @@ export default function CreativePage() {
         <main className="flex-1 overflow-y-auto p-6">
           {activeProject ? (
             <>
-              <section className="mb-6 rounded-xl border border-white/10 bg-[#161922] p-4">
-                <h2 className="mb-2 text-sm font-medium text-white/70">Generate an asset (brand-aware)</h2>
+              <section className="mb-6 rounded-xl border border-gray-200 bg-white p-4">
+                <h2 className="mb-2 text-sm font-medium text-gray-700">Generate an asset (brand-aware)</h2>
                 <textarea
                   value={genPrompt}
                   onChange={(e) => setGenPrompt(e.target.value)}
                   placeholder="Describe the asset to generate"
                   rows={2}
-                  className="mb-2 w-full resize-none rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500"
+                  className="mb-2 w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-900 outline-none focus:border-indigo-400 focus:bg-white"
                 />
                 <div className="mb-2 flex gap-2">
                   <select
                     value={genPurpose}
                     onChange={(e) => setGenPurpose(e.target.value as VectorDocumentPurpose)}
-                    className="rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1 text-xs text-white"
+                    className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-900"
                   >
                     {PURPOSE_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -316,20 +316,20 @@ export default function CreativePage() {
                     value={genLabel}
                     onChange={(e) => setGenLabel(e.target.value)}
                     placeholder="Label (optional)"
-                    className="flex-1 rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1 text-xs text-white"
+                    className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-900"
                   />
                 </div>
                 <button
                   onClick={handleGenerateAsset}
                   disabled={!genPrompt.trim() || generating}
-                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-40"
+                  className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
                 >
                   {generating ? "Generating..." : "+ Generate asset"}
                 </button>
               </section>
 
-              <section className="mb-6 rounded-xl border border-white/10 bg-[#161922] p-4">
-                <h2 className="mb-2 text-sm font-medium text-white/70">Attach an existing asset</h2>
+              <section className="mb-6 rounded-xl border border-gray-200 bg-white p-4">
+                <h2 className="mb-2 text-sm font-medium text-gray-700">Attach an existing asset</h2>
                 <div className="flex gap-2">
                   <select
                     value={attachType}
@@ -337,7 +337,7 @@ export default function CreativePage() {
                       setAttachType(e.target.value as CreativeAssetType);
                       setAttachId("");
                     }}
-                    className="rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1 text-xs text-white"
+                    className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-900"
                   >
                     <option value="VECTOR">Vector</option>
                     <option value="ANIMATION">Animation</option>
@@ -346,7 +346,7 @@ export default function CreativePage() {
                   <select
                     value={attachId}
                     onChange={(e) => setAttachId(e.target.value)}
-                    className="flex-1 rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1 text-xs text-white"
+                    className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-900"
                   >
                     <option value="">Select...</option>
                     {attachOptions.map((o) => (
@@ -358,7 +358,7 @@ export default function CreativePage() {
                   <button
                     onClick={handleAttach}
                     disabled={!attachId}
-                    className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-40"
+                    className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
                   >
                     Attach
                   </button>
@@ -366,25 +366,25 @@ export default function CreativePage() {
               </section>
 
               <section>
-                <h2 className="mb-2 text-sm font-medium text-white/70">Assets ({activeProject.assets.length})</h2>
+                <h2 className="mb-2 text-sm font-medium text-gray-700">Assets ({activeProject.assets.length})</h2>
                 <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
                   {activeProject.assets.map((asset) => (
-                    <div key={asset.id} className="rounded-lg border border-white/10 p-2 text-center">
+                    <div key={asset.id} className="rounded-lg border border-gray-200 p-2 text-center">
                       <AssetPreview exportUrl={EXPORT_URL_BY_TYPE[asset.asset_type](asset.asset_id)} />
-                      <p className="mt-1 truncate text-xs text-white/70">{asset.label || asset.asset_type}</p>
-                      <button onClick={() => handleDetach(asset)} className="text-xs text-white/40 hover:text-red-400">
+                      <p className="mt-1 truncate text-xs text-gray-700">{asset.label || asset.asset_type}</p>
+                      <button onClick={() => handleDetach(asset)} className="text-xs text-gray-400 hover:text-red-500">
                         detach
                       </button>
                     </div>
                   ))}
                   {activeProject.assets.length === 0 && (
-                    <p className="col-span-full py-6 text-center text-xs text-white/40">No assets yet.</p>
+                    <p className="col-span-full py-6 text-center text-xs text-gray-400">No assets yet.</p>
                   )}
                 </div>
               </section>
             </>
           ) : (
-            <p className="mt-20 text-center text-sm text-white/40">Create or select a creative project.</p>
+            <p className="mt-20 text-center text-sm text-gray-400">Create or select a creative project.</p>
           )}
         </main>
       </div>

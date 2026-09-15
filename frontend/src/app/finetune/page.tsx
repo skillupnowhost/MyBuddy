@@ -20,14 +20,14 @@ import {
 import type { DatasetItem, ModelBenchmarkResultItem, ModelStatus, RegisteredModelItem, TrainingJobItem } from "@/lib/types";
 
 const STATUS_COLORS: Record<string, string> = {
-  UPLOADED: "text-white/50",
-  VALIDATED: "text-emerald-400",
-  INVALID: "text-red-400",
-  PENDING: "text-white/50",
-  RUNNING: "text-amber-400",
-  COMPLETED: "text-emerald-400",
-  FAILED: "text-red-400",
-  CANCELLED: "text-white/40",
+  UPLOADED: "text-gray-500",
+  VALIDATED: "text-emerald-600",
+  INVALID: "text-red-500",
+  PENDING: "text-gray-500",
+  RUNNING: "text-amber-500",
+  COMPLETED: "text-emerald-600",
+  FAILED: "text-red-500",
+  CANCELLED: "text-gray-400",
 };
 
 const PROMOTION_OPTIONS: ModelStatus[] = ["EXPERIMENTAL", "CANARY", "STAGING", "PRODUCTION", "ARCHIVED", "REJECTED"];
@@ -131,37 +131,37 @@ export default function FinetunePage() {
   const validatedDatasets = datasets.filter((d) => d.status === "VALIDATED");
 
   return (
-    <div className="min-h-screen bg-[#0f1115] px-6 py-8 text-white">
+    <div className="min-h-screen bg-[#f4f5f9] px-6 py-8 text-gray-900">
       <div className="mx-auto max-w-4xl">
         <div className="mb-2 flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Fine-tuning</h1>
-          <Link href="/chat" className="text-sm text-blue-400 hover:underline">
+          <Link href="/chat" className="text-sm text-indigo-600 hover:underline">
             &larr; Back to chat
           </Link>
         </div>
-        <p className="mb-6 text-sm text-white/40">
+        <p className="mb-6 text-sm text-gray-400">
           Training runs as a separate process (see <code>training/README.md</code>). On a machine without a GPU and
           the training environment installed, jobs will correctly fail fast with a clear message rather than
           pretending to train — that's expected here.
         </p>
 
-        {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
+        {error && <p className="mb-4 text-sm text-red-500">{error}</p>}
 
-        <section className="mb-8 rounded-xl border border-white/10 bg-[#161922] p-4">
-          <h2 className="mb-3 text-sm font-medium text-white/70">Datasets</h2>
+        <section className="mb-8 rounded-xl border border-gray-200 bg-white p-4">
+          <h2 className="mb-3 text-sm font-medium text-gray-700">Datasets</h2>
           <input ref={fileInputRef} type="file" accept=".jsonl,.json" onChange={handleUpload} className="hidden" />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="mb-3 w-full rounded-lg border border-dashed border-white/20 py-2 text-sm text-white/70 hover:border-blue-500 hover:text-white"
+            className="mb-3 w-full rounded-lg border border-dashed border-gray-300 py-2 text-sm text-gray-500 hover:border-indigo-400 hover:text-gray-900"
           >
             + Upload a .jsonl instruction dataset
           </button>
           <div className="space-y-1">
             {datasets.map((d) => (
-              <div key={d.id} className="flex items-center justify-between rounded-lg px-2 py-2 text-sm hover:bg-white/5">
+              <div key={d.id} className="flex items-center justify-between rounded-lg px-2 py-2 text-sm hover:bg-gray-100">
                 <div>
-                  <p className="text-white/90">{d.filename}</p>
-                  <p className="text-xs text-white/40">
+                  <p className="text-gray-800">{d.filename}</p>
+                  <p className="text-xs text-gray-400">
                     {d.num_examples ?? 0} examples ·{" "}
                     <span className={STATUS_COLORS[d.status]}>{d.status}</span>
                     {d.error_message ? `: ${d.error_message}` : ""}
@@ -169,23 +169,23 @@ export default function FinetunePage() {
                 </div>
                 <button
                   onClick={() => deleteDataset(d.id).then(() => setDatasets((prev) => prev.filter((x) => x.id !== d.id)))}
-                  className="text-white/40 hover:text-red-400"
+                  className="text-gray-400 hover:text-red-500"
                 >
                   &times;
                 </button>
               </div>
             ))}
-            {datasets.length === 0 && <p className="py-4 text-center text-sm text-white/40">No datasets yet.</p>}
+            {datasets.length === 0 && <p className="py-4 text-center text-sm text-gray-400">No datasets yet.</p>}
           </div>
         </section>
 
-        <section className="mb-8 rounded-xl border border-white/10 bg-[#161922] p-4">
-          <h2 className="mb-3 text-sm font-medium text-white/70">Start a training job</h2>
+        <section className="mb-8 rounded-xl border border-gray-200 bg-white p-4">
+          <h2 className="mb-3 text-sm font-medium text-gray-700">Start a training job</h2>
           <div className="flex flex-wrap gap-2">
             <select
               value={selectedDataset}
               onChange={(e) => setSelectedDataset(e.target.value)}
-              className="rounded-lg border border-white/10 bg-[#0f1115] px-3 py-2 text-sm text-white"
+              className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900"
             >
               <option value="">Select a validated dataset...</option>
               {validatedDatasets.map((d) => (
@@ -198,12 +198,12 @@ export default function FinetunePage() {
               value={baseModel}
               onChange={(e) => setBaseModel(e.target.value)}
               placeholder="Base model (Hugging Face id)"
-              className="flex-1 rounded-lg border border-white/10 bg-[#0f1115] px-3 py-2 text-sm text-white"
+              className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900"
             />
             <button
               onClick={handleStartTraining}
               disabled={!selectedDataset || !baseModel.trim()}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40"
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
             >
               Start
             </button>
@@ -211,21 +211,21 @@ export default function FinetunePage() {
 
           <div className="mt-4 space-y-1">
             {jobs.map((job) => (
-              <div key={job.id} className="rounded-lg px-2 py-2 text-sm hover:bg-white/5">
+              <div key={job.id} className="rounded-lg px-2 py-2 text-sm hover:bg-gray-100">
                 <div className="flex items-center justify-between">
-                  <p className="text-white/90">{job.base_model}</p>
+                  <p className="text-gray-800">{job.base_model}</p>
                   <div className="flex items-center gap-2">
                     <span className={STATUS_COLORS[job.status]}>{job.status}</span>
                     {(job.status === "PENDING" || job.status === "RUNNING") && (
-                      <button onClick={() => handleCancel(job.id)} className="text-xs text-white/40 hover:text-red-400">
+                      <button onClick={() => handleCancel(job.id)} className="text-xs text-gray-400 hover:text-red-500">
                         cancel
                       </button>
                     )}
                   </div>
                 </div>
-                {job.error_message && <p className="text-xs text-red-400/80">{job.error_message}</p>}
+                {job.error_message && <p className="text-xs text-red-500/80">{job.error_message}</p>}
                 {job.eval_metrics && (
-                  <p className="text-xs text-white/40">
+                  <p className="text-xs text-gray-400">
                     {Object.entries(job.eval_metrics)
                       .map(([k, v]) => `${k}: ${v}`)
                       .join(" · ")}
@@ -233,37 +233,37 @@ export default function FinetunePage() {
                 )}
               </div>
             ))}
-            {jobs.length === 0 && <p className="py-4 text-center text-sm text-white/40">No training jobs yet.</p>}
+            {jobs.length === 0 && <p className="py-4 text-center text-sm text-gray-400">No training jobs yet.</p>}
           </div>
         </section>
 
-        <section className="rounded-xl border border-white/10 bg-[#161922] p-4">
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-medium text-white/70">Model registry</h2>
+            <h2 className="text-sm font-medium text-gray-700">Model registry</h2>
             {isAdmin && (
               <button
                 onClick={handleDiscover}
-                className="rounded-lg border border-white/10 px-3 py-1 text-xs text-white/70 hover:border-blue-500 hover:text-white"
+                className="rounded-lg border border-gray-200 px-3 py-1 text-xs text-gray-700 hover:border-indigo-400 hover:text-gray-900"
               >
                 Discover local models
               </button>
             )}
           </div>
-          <p className="mb-3 text-xs text-white/40">
+          <p className="mb-3 text-xs text-gray-400">
             Only local Ollama models are supported right now (no cloud provider keys configured, by design). The
             router picks the highest-scoring PRODUCTION model per capability for chat automatically.
           </p>
           <div className="space-y-1">
             {models.map((model) => (
-              <div key={model.id} className="rounded-lg px-2 py-2 text-sm hover:bg-white/5">
+              <div key={model.id} className="rounded-lg px-2 py-2 text-sm hover:bg-gray-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-white/90">
-                      {model.name} <span className="text-white/40">({model.base_model})</span>
+                    <p className="text-gray-800">
+                      {model.name} <span className="text-gray-400">({model.base_model})</span>
                     </p>
-                    <p className="text-xs text-white/40">
-                      <span className="rounded bg-white/10 px-1.5 py-0.5">{model.capability}</span>{" "}
-                      <span className="rounded bg-white/10 px-1.5 py-0.5">{model.provider}</span>{" "}
+                    <p className="text-xs text-gray-400">
+                      <span className="rounded bg-gray-100 px-1.5 py-0.5">{model.capability}</span>{" "}
+                      <span className="rounded bg-gray-100 px-1.5 py-0.5">{model.provider}</span>{" "}
                       {model.status}
                       {model.eval_score !== null ? ` · eval: ${model.eval_score.toFixed(2)}` : " · not benchmarked"}
                     </p>
@@ -273,7 +273,7 @@ export default function FinetunePage() {
                       <button
                         onClick={() => handleBenchmark(model.id)}
                         disabled={benchmarking === model.id}
-                        className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white/70 hover:border-blue-500 hover:text-white disabled:opacity-40"
+                        className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:border-indigo-400 hover:text-gray-900 disabled:opacity-40"
                       >
                         {benchmarking === model.id ? "Benchmarking…" : "Benchmark"}
                       </button>
@@ -282,7 +282,7 @@ export default function FinetunePage() {
                       <select
                         value={model.status}
                         onChange={(e) => handlePromote(model.id, e.target.value as ModelStatus)}
-                        className="rounded-lg border border-white/10 bg-[#0f1115] px-2 py-1 text-xs text-white"
+                        className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-900"
                       >
                         {PROMOTION_OPTIONS.map((s) => (
                           <option key={s} value={s}>
@@ -294,20 +294,20 @@ export default function FinetunePage() {
                   </div>
                 </div>
                 {benchmarkResults[model.id] && (
-                  <table className="mt-2 w-full text-xs text-white/60">
+                  <table className="mt-2 w-full text-xs text-gray-600">
                     <tbody>
                       {benchmarkResults[model.id].length === 0 ? (
                         <tr>
-                          <td className="py-1 text-white/40">
+                          <td className="py-1 text-gray-400">
                             No benchmark suite defined yet for {model.capability} models.
                           </td>
                         </tr>
                       ) : (
                         benchmarkResults[model.id].map((r) => (
-                          <tr key={r.id} className="border-t border-white/5">
+                          <tr key={r.id} className="border-t border-gray-100">
                             <td className="py-1 pr-3">{r.prompt_id}</td>
                             <td className="py-1 pr-3">{r.score.toFixed(2)}</td>
-                            <td className="py-1 text-white/40">{r.latency_ms}ms</td>
+                            <td className="py-1 text-gray-400">{r.latency_ms}ms</td>
                           </tr>
                         ))
                       )}
@@ -316,7 +316,7 @@ export default function FinetunePage() {
                 )}
               </div>
             ))}
-            {models.length === 0 && <p className="py-4 text-center text-sm text-white/40">No registered models yet.</p>}
+            {models.length === 0 && <p className="py-4 text-center text-sm text-gray-400">No registered models yet.</p>}
           </div>
         </section>
       </div>

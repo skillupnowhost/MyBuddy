@@ -1,3 +1,4 @@
+import { FileText, Folder } from "lucide-react";
 import type { CodeFileItem } from "@/lib/types";
 
 interface TreeNode {
@@ -50,15 +51,20 @@ function TreeNodeView({
             <button
               onClick={() => onSelect(child.file!)}
               style={{ paddingLeft: `${depth * 14 + 12}px` }}
-              className={`block w-full truncate px-2 py-1 text-left text-xs transition ${
-                selectedId === child.file.id ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"
+              className={`group flex w-full items-center gap-1.5 truncate px-2 py-1 text-left text-xs transition ${
+                selectedId === child.file.id ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
               }`}
             >
-              📄 {name}
+              <FileText className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 group-hover:scale-110" strokeWidth={2} />
+              {name}
             </button>
           ) : (
-            <div style={{ paddingLeft: `${depth * 14 + 12}px` }} className="px-2 py-1 text-xs font-medium text-white/40">
-              📁 {name}
+            <div
+              style={{ paddingLeft: `${depth * 14 + 12}px` }}
+              className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-gray-400"
+            >
+              <Folder className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+              {name}
             </div>
           )}
           {child.children.size > 0 && (
@@ -80,7 +86,7 @@ export default function CodeFileTree({
   onSelect: (file: CodeFileItem) => void;
 }) {
   if (files.length === 0) {
-    return <p className="py-4 text-center text-xs text-white/40">No files yet.</p>;
+    return <p className="py-4 text-center text-xs text-gray-400">No files yet.</p>;
   }
   const tree = buildTree(files);
   return (
