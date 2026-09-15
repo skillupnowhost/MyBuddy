@@ -37,6 +37,8 @@ from app.db.models.storyboard_shot import StoryboardShot
 from app.db.models.character import Character
 from app.db.models.world_bible import WorldBible
 from app.db.models.camera_plan import CameraPlan
+from app.db.models.model_3d import Model3D
+from app.db.models.model_3d_generation_job import Model3DGenerationJob
 
 __all__ = [
     "User",
@@ -78,4 +80,6 @@ __all__ = [
     "Character",
     "WorldBible",
     "CameraPlan",
+    "Model3D",
+    "Model3DGenerationJob",
 ]

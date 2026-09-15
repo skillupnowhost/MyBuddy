@@ -99,6 +99,16 @@ class Settings(BaseSettings):
     video_gen_max_num_frames: int = 64
     video_gen_fps: int = 8
 
+    # --- MyBuddy CG: text/image -> 3D mesh generation (video/CG/VFX spec §11-13) ---
+    # Shap-E via diffusers — text-to-3D and image-to-3D through the same library already
+    # used for Image/Video, rather than a new ML stack. Same CPU-hardware caveat as
+    # video_gen_*; see cg3d/README.md.
+    cg3d_text_model: str = "openai/shap-e"
+    cg3d_image_model: str = "openai/shap-e-img2img"
+    cg3d_default_steps: int = 64
+    cg3d_max_steps: int = 128
+    cg3d_default_guidance_scale: float = 15.0
+
     # --- StoryboardGenerator (video/CG/VFX spec §7) ---
     # Pure LLM structured output, same fenced-block + Pydantic-validation + repair-retry
     # convention as Vector's generate_scene — no image/video model involved, so this reuses

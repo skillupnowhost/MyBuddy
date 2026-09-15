@@ -15,7 +15,9 @@ from app.api.v1.endpoints import (
     image_generation,
     images,
     memories,
+    model_3d_generation,
     models,
+    models_3d,
     motion,
     storyboard,
     training,
@@ -49,4 +51,6 @@ api_router.include_router(storyboard.router)
 api_router.include_router(characters.router)
 api_router.include_router(world_bibles.router)
 api_router.include_router(camera_plans.router)
+api_router.include_router(models_3d.router)
+api_router.include_router(model_3d_generation.router)
 api_router.include_router(workspaces.router)

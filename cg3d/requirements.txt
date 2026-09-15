@@ -1,0 +1,24 @@
+# 3D generation environment — deliberately separate from backend/requirements.txt and the
+# other subprocess venvs (imagegen/, video/, training/, research/). Install into its own venv
+# (cg3d/.venv):
+#
+#   cd cg3d
+#   python -m venv .venv
+#   .venv\Scripts\activate      # Windows
+#   pip install -r requirements.txt
+#
+# GPU strongly recommended — Shap-E denoises a latent 3D representation over many steps,
+# closer in cost to image generation than to video generation, but still impractical on
+# CPU-only hardware for anything beyond a smoke test.
+
+torch==2.5.1
+diffusers==0.31.0
+transformers==4.47.1
+accelerate==1.2.1
+safetensors==0.4.5
+sqlalchemy==2.0.36
+psycopg[binary]==3.2.3
+pillow==11.0.0
+
+# Shap-E's mesh/ply export path (diffusers.utils.export_to_obj/export_to_ply) uses trimesh.
+trimesh==4.5.3
