@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.videos import get_owned_video
 from app.core.deps import get_current_user, get_db
+from app.db.models.image import Image
 from app.db.models.user import User
 from app.db.models.video_edit_job import VideoEditJob
 from app.schemas.video_edit import VideoEditCreate, VideoEditRead
@@ -27,11 +28,21 @@ def create_video_edit_job(
 ):
     source_video = get_owned_video(db, payload.source_video_id, user)
 
+    mask_image = None
+    if payload.mask_image_id is not None:
+        mask_image = db.get(Image, payload.mask_image_id)
+        if mask_image is None or mask_image.user_id != user.id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mask image not found")
+
     job = VideoEditJob(
         user_id=user.id,
         operation=payload.operation,
         source_video_id=payload.source_video_id,
         background_color=payload.background_color,
+        mask_image_id=payload.mask_image_id,
+        prompt=payload.prompt,
+        negative_prompt=payload.negative_prompt,
+        steps=payload.steps,
     )
     db.add(job)
     db.commit()
@@ -39,7 +50,15 @@ def create_video_edit_job(
 
     try:
         proc = launch_video_edit_job(
-            str(job.id), str(user.id), payload.operation, source_video.storage_path, payload.background_color
+            str(job.id),
+            str(user.id),
+            payload.operation,
+            source_video.storage_path,
+            payload.background_color,
+            mask_image.storage_path if mask_image is not None else None,
+            payload.prompt,
+            payload.negative_prompt,
+            payload.steps,
         )
         job.pid = getattr(proc, "pid", None)
         db.commit()

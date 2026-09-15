@@ -3,6 +3,10 @@ import io
 from app.services.video_edit_service import launch_video_edit_job
 
 _MP4_BYTES = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 32  # not a real playable MP4, just non-empty bytes
+_PNG_BYTES = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde"
+    b"\x00\x00\x00\x0cIDATx\x9cc\xf8\xcf\xc0\x00\x00\x03\x01\x01\x00\x18\xdd\x8d\xb0\x00\x00\x00\x00IEND\xaeB`\x82"
+)
 
 
 def _register_and_login(client, email, password="supersecret123"):
@@ -15,6 +19,12 @@ def _upload_video(client, headers):
     return client.post(
         "/api/v1/videos", headers=headers, files={"file": ("clip.mp4", io.BytesIO(_MP4_BYTES), "video/mp4")}
     )
+
+
+def _upload_mask_image(client, headers):
+    return client.post(
+        "/api/v1/images", headers=headers, files={"file": ("mask.png", io.BytesIO(_PNG_BYTES), "image/png")}
+    ).json()["id"]
 
 
 # --- upload ------------------------------------------------------------------------------
@@ -143,3 +153,67 @@ def test_launch_video_edit_job_spawns_a_real_separate_process():
     )
     assert proc.pid is not None
     proc.wait(timeout=30)
+
+
+# --- REMOVE_OBJECT ---------------------------------------------------------------------------
+
+
+def test_remove_object_requires_mask_and_prompt(client):
+    token = _register_and_login(client, "video-edit-object-missing@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    video = _upload_video(client, headers).json()
+
+    resp = client.post(
+        "/api/v1/video-edit",
+        json={"operation": "REMOVE_OBJECT", "source_video_id": video["id"]},
+        headers=headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_remove_object_job_created_with_mask_and_prompt(client, monkeypatch):
+    monkeypatch.setattr("app.api.v1.endpoints.video_edit.launch_video_edit_job", lambda *a, **k: None)
+    token = _register_and_login(client, "video-edit-object-user@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    video = _upload_video(client, headers).json()
+    mask_id = _upload_mask_image(client, headers)
+
+    resp = client.post(
+        "/api/v1/video-edit",
+        json={
+            "operation": "REMOVE_OBJECT",
+            "source_video_id": video["id"],
+            "mask_image_id": mask_id,
+            "prompt": "empty street",
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["operation"] == "REMOVE_OBJECT"
+    assert body["mask_image_id"] == mask_id
+    assert body["prompt"] == "empty street"
+    assert body["steps"] > 0
+
+
+def test_remove_object_rejects_other_users_mask_image(client, monkeypatch):
+    monkeypatch.setattr("app.api.v1.endpoints.video_edit.launch_video_edit_job", lambda *a, **k: None)
+    token_a = _register_and_login(client, "video-edit-mask-owner@example.com")
+    token_b = _register_and_login(client, "video-edit-mask-borrower@example.com")
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+
+    video = _upload_video(client, headers_a).json()
+    other_mask_id = _upload_mask_image(client, headers_b)
+
+    resp = client.post(
+        "/api/v1/video-edit",
+        json={
+            "operation": "REMOVE_OBJECT",
+            "source_video_id": video["id"],
+            "mask_image_id": other_mask_id,
+            "prompt": "empty street",
+        },
+        headers=headers_a,
+    )
+    assert resp.status_code == 404
