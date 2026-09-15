@@ -40,6 +40,9 @@ from app.db.models.camera_plan import CameraPlan
 from app.db.models.model_3d import Model3D
 from app.db.models.model_3d_generation_job import Model3DGenerationJob
 from app.db.models.video_edit_job import VideoEditJob
+from app.db.models.video_timeline import VideoTimeline
+from app.db.models.video_timeline_clip import VideoTimelineClip
+from app.db.models.video_timeline_export_job import VideoTimelineExportJob
 
 __all__ = [
     "User",
@@ -84,4 +87,7 @@ __all__ = [
     "Model3D",
     "Model3DGenerationJob",
     "VideoEditJob",
+    "VideoTimeline",
+    "VideoTimelineClip",
+    "VideoTimelineExportJob",
 ]
