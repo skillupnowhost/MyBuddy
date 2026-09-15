@@ -14,7 +14,7 @@ class SearchMemoriesTool(Tool):
     name = "search_memories"
     description = 'Searches your own saved memories for a keyword. Args: {"query": "<keyword>"}'
 
-    def run(self, args: dict, context: ToolContext | None = None) -> str:
+    async def run(self, args: dict, context: ToolContext | None = None) -> str:
         if context is None:
             return "Error: this tool requires an authenticated context."
 

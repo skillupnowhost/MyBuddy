@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.services.llm_provider import LLMProvider
 from app.services.model_router import get_model_router
-from app.services.tools import ToolContext, get_tools_system_prompt, maybe_run_tool_call
+from app.services.tools import ToolContext, get_current_datetime_context, get_tools_system_prompt, maybe_run_tool_call
 
 VALID_STEP_TYPES = ("REASONING", "CODING", "TOOL")
 
@@ -74,7 +74,7 @@ async def _generate_plan(
     allowed_types = VALID_STEP_TYPES if tools_enabled else ("REASONING", "CODING")
     system_prompt = _PLANNER_SYSTEM_PROMPT.format(max_steps=max_steps, tool_line=tool_line).rstrip()
     messages = [
-        {"role": "system", "content": system_prompt},
+        {"role": "system", "content": f"{get_current_datetime_context()}\n\n{system_prompt}"},
         {"role": "user", "content": user_content},
     ]
 
@@ -129,7 +129,7 @@ async def _execute_step(
 
     if step.step_type == "TOOL" and tools_enabled:
         messages = [
-            {"role": "system", "content": get_tools_system_prompt()},
+            {"role": "system", "content": f"{get_current_datetime_context()}\n\n{get_tools_system_prompt()}"},
             {"role": "user", "content": step.instruction},
         ]
         reply = await llm_client.chat(model, messages)
@@ -138,7 +138,11 @@ async def _execute_step(
             reply = f"{reply}\n[Tool result: {tool_result.result}]"
         return model, reply
 
-    reply = await llm_client.chat(model, [{"role": "user", "content": step.instruction}])
+    messages = [
+        {"role": "system", "content": get_current_datetime_context()},
+        {"role": "user", "content": step.instruction},
+    ]
+    reply = await llm_client.chat(model, messages)
     return model, reply
 
 

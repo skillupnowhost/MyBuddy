@@ -16,6 +16,7 @@ from app.db.models.message import Message
 from app.db.models.model_registry import RegisteredModel
 from app.db.models.usage_log import UsageLog
 from app.services.agent_service import AgentStepResult, run_agent_loop
+from app.services.code_execution_service import maybe_run_code_and_format_output
 from app.services.code_rag_service import build_code_rag_prompt, retrieve_code_context
 from app.services.code_vector_store import CodeVectorStoreProvider
 from app.services.embedding_provider import EmbeddingProvider
@@ -29,21 +30,56 @@ from app.services.max_mode_service import (
 from app.services.memory_service import extract_and_save_memories, get_memory_context
 from app.services.model_router import get_model_router
 from app.services.rag_service import build_rag_prompt, retrieve_context
-from app.services.tools import ToolContext, get_tools_system_prompt, maybe_run_tool_call
+from app.services.tools import (
+    ToolContext,
+    get_current_datetime_context,
+    get_tools_system_prompt,
+    looks_like_tool_call_start,
+    maybe_run_tool_call,
+)
 from app.services.vector_store import VectorStoreProvider
 
 settings = get_settings()
 
+# How many characters of a tool-enabled reply to hold back before showing anything, so
+# "```tool" or a bare '{"tool"...' opening can be told apart from a normal answer (even one
+# that starts with an ordinary code fence or a literal `{`) before any of it is displayed.
+# Long enough to cover both prefixes with room for a little leading whitespace; short enough
+# that a normal reply still feels like it's streaming live.
+_TOOL_CALL_LOOKAHEAD_CHARS = 12
+
+# Always-on, not tied to tools_enabled: a small local model left to its own defaults tends to
+# wrap even a one-line request in unnecessary boilerplate (a function, a main() guard, an
+# input() prompt) and to hand back code with no explanation of how it works — the opposite of
+# what was asked for a "simple" snippet, and short of what a reference chat UI's code answers
+# look like (code, then a plain-language walkthrough, then a sample run).
+_CODE_ANSWER_STYLE = (
+    "When your answer includes code: match the requested scope exactly — if asked for "
+    "something simple, write the most direct version (no function wrapper, no main() guard, "
+    "no input() prompt) unless one was actually requested, and honor every explicit detail in "
+    "the request itself (e.g. 'with command line arguments' means read sys.argv/argparse, not "
+    "input() or a hardcoded value — a stated requirement always overrides the simpler default). "
+    "After the code, add a short 'How it works' section as a few bullet points walking through "
+    "the key lines. Do not write your own 'Output' or example-run section — a real Python "
+    "snippet is actually executed after you answer and its true output is appended "
+    "automatically, so writing one yourself would only add a second, possibly wrong one. Skip "
+    "this structure for one-line answers or questions that aren't about code."
+)
+
 
 def _history_for_ollama(conversation: Conversation, memory_context: str | None) -> list[dict]:
     history = []
-    system_parts = []
+    # Unconditional, not gated behind tools_enabled: no local model knows "right now" from
+    # training regardless of how recently it was trained, and relying on the model to reliably
+    # invoke the current_datetime tool (small models often don't emit the fenced-block call
+    # correctly) is how "what's the date?" produced a hallucinated year.
+    system_parts = [get_current_datetime_context(), _CODE_ANSWER_STYLE]
     if conversation.system_prompt:
         system_parts.append(conversation.system_prompt)
     if memory_context:
         system_parts.append(memory_context)
     if conversation.tools_enabled or conversation.agent_mode_enabled:
-        system_parts.append(get_tools_system_prompt())
+        system_parts.append(get_tools_system_prompt(code_project_active=bool(conversation.code_project_id)))
     if system_parts:
         history.append({"role": "system", "content": "\n\n".join(system_parts)})
     for msg in conversation.messages:
@@ -113,6 +149,10 @@ async def stream_assistant_reply(
         user_message = Message(conversation_id=conversation.id, role="user", content=user_content)
         db.add(user_message)
         db.commit()
+        # The frontend only ever has a client-generated placeholder id for this message until
+        # it hears this — needed so a later "edit and resend" can name the real row to delete
+        # server-side instead of silently leaving a stale exchange behind.
+        yield f"data: {json.dumps({'user_message_id': str(user_message.id)})}\n\n"
 
         if is_first_message:
             conversation.title = _derive_title(user_content)
@@ -212,6 +252,7 @@ async def stream_assistant_reply(
         max_mode_results: list[MaxModeCandidateResult] = []
         expert_pipeline_steps: list[ExpertStepResult] = []
         agent_steps: list[AgentStepResult] = []
+        generated_image_id: uuid.UUID | None = None
         try:
             if expert_pipeline_active:
                 try:
@@ -245,28 +286,85 @@ async def stream_assistant_reply(
                 # scope for v1 — the tool-call convention expects a single model's raw
                 # fenced-block output, not a judge's prose synthesis — so MAX-mode
                 # conversations skip the tools_enabled branch entirely.
+            elif conversation.tools_enabled:
+                # A tool call is only ever valid as the model's ENTIRE first-pass reply (per
+                # the system prompt), so its opening characters give it away early. Hold back
+                # exactly that much before showing anything, so raw tool-call syntax — fenced,
+                # or on a small model that drops the fence, completely bare JSON — never
+                # flashes into the chat as if it were the answer (see looks_like_tool_call_start).
+                lookahead = ""
+                decided = False
+                showing = False
+                looks_like_tool_call = False
+                async for delta in llm_client.chat_stream(model, history, usage_sink=usage_sink):
+                    full_reply += delta
+                    if showing:
+                        yield f"data: {json.dumps({'delta': delta})}\n\n"
+                        continue
+                    if decided:
+                        # Decided, but not showing: this IS a tool-call attempt — keep
+                        # silently buffering into full_reply (above) for the rest of this pass.
+                        continue
+                    lookahead += delta
+                    if len(lookahead) < _TOOL_CALL_LOOKAHEAD_CHARS:
+                        continue
+                    decided = True
+                    looks_like_tool_call = looks_like_tool_call_start(lookahead)
+                    showing = not looks_like_tool_call
+                    if showing:
+                        yield f"data: {json.dumps({'delta': lookahead})}\n\n"
+                if not decided:
+                    # Stream ended before the lookahead filled — too short to matter either
+                    # way, so just show what came in.
+                    looks_like_tool_call = looks_like_tool_call_start(lookahead)
+                    if not looks_like_tool_call:
+                        yield f"data: {json.dumps({'delta': lookahead})}\n\n"
+
+                tool_result = await maybe_run_tool_call(full_reply, ToolContext(db=db, user_id=conversation.user_id))
+                if tool_result is not None:
+                    yield f"data: {json.dumps({'tool_call': tool_result.tool_name})}\n\n"
+                    if tool_result.image_id is not None:
+                        generated_image_id = tool_result.image_id
+                        # Sent as soon as it's known so the frontend can render the image
+                        # inline while the model is still streaming its follow-up reply, not
+                        # only after a page reload re-fetches the persisted message.
+                        yield f"data: {json.dumps({'image_id': str(tool_result.image_id)})}\n\n"
+                    history.append({"role": "assistant", "content": full_reply})
+                    history.append({"role": "user", "content": f"[Tool result: {tool_result.result}]"})
+                    full_reply = ""
+                    async for delta in llm_client.chat_stream(model, history, usage_sink=usage_sink):
+                        full_reply += delta
+                        yield f"data: {json.dumps({'delta': delta})}\n\n"
+                elif looks_like_tool_call:
+                    # Looked like an attempted tool call (fenced or bare) but didn't resolve
+                    # to a real one (malformed JSON, unknown tool name, ...) — show it rather
+                    # than silently dropping the reply, which would look exactly like the "no
+                    # response ever arrives" failure this whole flow exists to avoid.
+                    for chunk in _chunk_text(full_reply):
+                        yield f"data: {json.dumps({'delta': chunk})}\n\n"
             else:
                 async for delta in llm_client.chat_stream(model, history, usage_sink=usage_sink):
                     full_reply += delta
                     yield f"data: {json.dumps({'delta': delta})}\n\n"
 
-                if conversation.tools_enabled:
-                    tool_result = await maybe_run_tool_call(
-                        full_reply, ToolContext(db=db, user_id=conversation.user_id)
-                    )
-                    if tool_result is not None:
-                        yield f"data: {json.dumps({'tool_call': tool_result.tool_name})}\n\n"
-                        history.append({"role": "assistant", "content": full_reply})
-                        history.append({"role": "user", "content": f"[Tool result: {tool_result.result}]"})
-                        full_reply = ""
-                        async for delta in llm_client.chat_stream(model, history, usage_sink=usage_sink):
-                            full_reply += delta
-                            yield f"data: {json.dumps({'delta': delta})}\n\n"
+            # A real, sandboxed run of the reply's first python code block, not the model's own
+            # guess at what it would print — appended (and streamed) the same way for every
+            # branch above, so "does this actually work" is answered the same regardless of
+            # whether tools, MAX mode, or plain generation produced the code.
+            output_section = await maybe_run_code_and_format_output(full_reply)
+            if output_section:
+                full_reply += output_section
+                yield f"data: {json.dumps({'delta': output_section})}\n\n"
         finally:
             if full_reply:
                 assistant_message = Message(conversation_id=conversation.id, role="assistant", content=full_reply)
                 db.add(assistant_message)
                 db.commit()
+                if generated_image_id is not None:
+                    generated_image = db.get(Image, generated_image_id)
+                    if generated_image is not None and generated_image.user_id == conversation.user_id:
+                        generated_image.message_id = assistant_message.id
+                        db.commit()
                 if expert_pipeline_steps:
                     db.add_all(
                         [

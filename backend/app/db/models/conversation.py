@@ -19,7 +19,10 @@ class Conversation(Base):
     system_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
     model: Mapped[str | None] = mapped_column(String(255), nullable=True)
     rag_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
-    tools_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    # Defaults on (unlike the other opt-in flags below) so a new conversation can answer
+    # basic tool-backed questions (date/time, calculator) without the user discovering and
+    # flipping a toggle first — see conversations.py's create endpoint and the 0034 migration.
+    tools_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     # MAX mode (phase 9 sub-phase 3): fan a turn out to every PRODUCTION/CANARY model for the
     # conversation's capability, then synthesize one judged reply — see
     # chat_service._max_mode_reply. A no-op (falls back to the normal single-model path) when

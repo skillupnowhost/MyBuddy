@@ -20,7 +20,7 @@ class ReadCodeFileTool(Tool):
         '{"project_id": "<uuid>", "path": "<relative path within the project>"}'
     )
 
-    def run(self, args: dict, context: ToolContext | None = None) -> str:
+    async def run(self, args: dict, context: ToolContext | None = None) -> str:
         if context is None:
             return "Error: this tool requires an authenticated context."
 

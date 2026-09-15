@@ -1,6 +1,8 @@
 import json
 import uuid
 
+import pytest
+
 from app.core.config import get_settings
 from app.db.models.agent_step import AgentStep
 from app.db.models.code_file import CodeFile
@@ -31,12 +33,14 @@ def _tool_call_reply(tool: str, args: dict) -> str:
 # --- read_code_file tool --------------------------------------------------------------------
 
 
-def test_read_code_file_requires_context(db_session):
+@pytest.mark.asyncio
+async def test_read_code_file_requires_context(db_session):
     tool = ReadCodeFileTool()
-    assert tool.run({"project_id": "x", "path": "a.py"}) == "Error: this tool requires an authenticated context."
+    assert await tool.run({"project_id": "x", "path": "a.py"}) == "Error: this tool requires an authenticated context."
 
 
-def test_read_code_file_rejects_other_users_project(db_session, tmp_path):
+@pytest.mark.asyncio
+async def test_read_code_file_rejects_other_users_project(db_session, tmp_path):
     owner_id = uuid.uuid4()
     intruder_id = uuid.uuid4()
     project = CodeProject(
@@ -46,13 +50,14 @@ def test_read_code_file_rejects_other_users_project(db_session, tmp_path):
     db_session.commit()
 
     tool = ReadCodeFileTool()
-    result = tool.run(
+    result = await tool.run(
         {"project_id": str(project.id), "path": "a.py"}, ToolContext(db=db_session, user_id=intruder_id)
     )
     assert "not found" in result.lower()
 
 
-def test_read_code_file_reads_owned_file(db_session, tmp_path):
+@pytest.mark.asyncio
+async def test_read_code_file_reads_owned_file(db_session, tmp_path):
     user_id = uuid.uuid4()
     file_path = tmp_path / "a.py"
     file_path.write_text("print('hi')")
@@ -66,18 +71,19 @@ def test_read_code_file_reads_owned_file(db_session, tmp_path):
     db_session.commit()
 
     tool = ReadCodeFileTool()
-    result = tool.run({"project_id": str(project.id), "path": "a.py"}, ToolContext(db=db_session, user_id=user_id))
+    result = await tool.run({"project_id": str(project.id), "path": "a.py"}, ToolContext(db=db_session, user_id=user_id))
     assert result == "print('hi')"
 
 
-def test_read_code_file_missing_file_in_owned_project(db_session, tmp_path):
+@pytest.mark.asyncio
+async def test_read_code_file_missing_file_in_owned_project(db_session, tmp_path):
     user_id = uuid.uuid4()
     project = CodeProject(id=uuid.uuid4(), user_id=user_id, name="proj", storage_dir=str(tmp_path), status="READY")
     db_session.add(project)
     db_session.commit()
 
     tool = ReadCodeFileTool()
-    result = tool.run(
+    result = await tool.run(
         {"project_id": str(project.id), "path": "missing.py"}, ToolContext(db=db_session, user_id=user_id)
     )
     assert "not found" in result.lower()
@@ -86,12 +92,14 @@ def test_read_code_file_missing_file_in_owned_project(db_session, tmp_path):
 # --- search_memories tool -------------------------------------------------------------------
 
 
-def test_search_memories_requires_context(db_session):
+@pytest.mark.asyncio
+async def test_search_memories_requires_context(db_session):
     tool = SearchMemoriesTool()
-    assert tool.run({"query": "x"}) == "Error: this tool requires an authenticated context."
+    assert await tool.run({"query": "x"}) == "Error: this tool requires an authenticated context."
 
 
-def test_search_memories_finds_own_matches_only(db_session):
+@pytest.mark.asyncio
+async def test_search_memories_finds_own_matches_only(db_session):
     owner_id = uuid.uuid4()
     other_id = uuid.uuid4()
     db_session.add_all(
@@ -104,16 +112,17 @@ def test_search_memories_finds_own_matches_only(db_session):
     db_session.commit()
 
     tool = SearchMemoriesTool()
-    result = tool.run({"query": "pizza"}, ToolContext(db=db_session, user_id=owner_id))
+    result = await tool.run({"query": "pizza"}, ToolContext(db=db_session, user_id=owner_id))
     assert "likes pizza" in result
     assert "works remotely" not in result
     assert "also likes pizza" not in result
 
 
-def test_search_memories_no_match(db_session):
+@pytest.mark.asyncio
+async def test_search_memories_no_match(db_session):
     user_id = uuid.uuid4()
     tool = SearchMemoriesTool()
-    result = tool.run({"query": "nonexistent"}, ToolContext(db=db_session, user_id=user_id))
+    result = await tool.run({"query": "nonexistent"}, ToolContext(db=db_session, user_id=user_id))
     assert result == "No matching memories found."
 
 

@@ -11,6 +11,10 @@ if TYPE_CHECKING:
 class ToolCallResult:
     tool_name: str
     result: str
+    # Set only by tools that produce a viewable image (currently just generate_image) — lets
+    # chat_service attach the generated Image to the assistant's persisted message without
+    # every other tool's plain-text result needing to carry this field.
+    image_id: uuid.UUID | None = None
 
 
 @dataclass
@@ -36,5 +40,5 @@ class Tool(ABC):
     description: str
 
     @abstractmethod
-    def run(self, args: dict, context: ToolContext | None = None) -> str:
+    async def run(self, args: dict, context: ToolContext | None = None) -> str:
         ...

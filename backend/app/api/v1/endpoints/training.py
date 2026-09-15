@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from datetime import datetime, timezone
 
-from app.core.deps import get_current_admin, get_current_user, get_db
+from app.core.deps import get_current_admin, get_db
 from app.db.models.dataset import Dataset
 from app.db.models.model_registry import RegisteredModel
 from app.db.models.training_job import TrainingJob
@@ -42,7 +42,7 @@ def _get_owned_job(db: Session, job_id: uuid.UUID, user: User) -> TrainingJob:
 async def upload_dataset(
     file: UploadFile,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_admin),
 ):
     if not (file.filename or "").endswith((".jsonl", ".json")):
         raise HTTPException(
@@ -64,12 +64,12 @@ async def upload_dataset(
 
 
 @router.get("/datasets", response_model=list[DatasetRead])
-def list_datasets(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def list_datasets(db: Session = Depends(get_db), user: User = Depends(get_current_admin)):
     return db.query(Dataset).filter(Dataset.user_id == user.id).order_by(Dataset.created_at.desc()).all()
 
 
 @router.delete("/datasets/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_dataset(dataset_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def delete_dataset(dataset_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_admin)):
     dataset = _get_owned_dataset(db, dataset_id, user)
     delete_upload(dataset.storage_path)
     db.delete(dataset)
@@ -80,7 +80,7 @@ def delete_dataset(dataset_id: uuid.UUID, db: Session = Depends(get_db), user: U
 def create_training_job(
     payload: TrainingJobCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_admin),
 ):
     dataset = _get_owned_dataset(db, payload.dataset_id, user)
     if dataset.status != "VALIDATED":
@@ -115,7 +115,7 @@ def create_training_job(
 
 
 @router.post("/training-jobs/{job_id}/cancel", response_model=TrainingJobRead)
-def cancel_job(job_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def cancel_job(job_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_admin)):
     job = _get_owned_job(db, job_id, user)
     if job.status not in ("PENDING", "RUNNING"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Job is already {job.status}")
@@ -131,17 +131,17 @@ def cancel_job(job_id: uuid.UUID, db: Session = Depends(get_db), user: User = De
 
 
 @router.get("/training-jobs", response_model=list[TrainingJobRead])
-def list_training_jobs(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def list_training_jobs(db: Session = Depends(get_db), user: User = Depends(get_current_admin)):
     return db.query(TrainingJob).filter(TrainingJob.user_id == user.id).order_by(TrainingJob.created_at.desc()).all()
 
 
 @router.get("/training-jobs/{job_id}", response_model=TrainingJobRead)
-def get_training_job(job_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def get_training_job(job_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_admin)):
     return _get_owned_job(db, job_id, user)
 
 
 @router.get("/models/registry", response_model=list[RegisteredModelRead])
-def list_registered_models(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def list_registered_models(db: Session = Depends(get_db), user: User = Depends(get_current_admin)):
     return db.query(RegisteredModel).order_by(RegisteredModel.created_at.desc()).all()
 
 

@@ -14,7 +14,18 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
 
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "llama3.2:1b"
+    # Qwen3 1.7B over Llama 3.2 1B: newer training data, notably better instruction-following
+    # (this app's tool-calling relies on the model reliably emitting a fenced ```tool block,
+    # which weaker models skip) — verified on this project's actual hardware first: a 4B
+    # model's cold load took ~19 minutes here (RAM/pagefile-constrained, same root cause noted
+    # for image_gen_model above), so this stays in the ~1.3-1.7GB range where cold load is a
+    # few seconds, matching the previous default. Qwen3 defaults to emitting a hidden
+    # "thinking" trace (adds real generation time, though llm_client.py already only reads
+    # message.content and never surfaces it) — NOT suppressed via Ollama's `think` request
+    # param: sending `think` to a model that doesn't declare "thinking" in its capabilities
+    # (e.g. qwen2.5-coder, used for CODE) crashed that model's llama-server subprocess outright
+    # during testing. Not worth that blast radius for a few seconds of latency.
+    ollama_model: str = "qwen3:1.7b"
     ollama_embedding_model: str = "all-minilm"
 
     frontend_origin: str = "http://localhost:3000"

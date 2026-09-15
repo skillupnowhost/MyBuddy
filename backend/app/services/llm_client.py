@@ -54,7 +54,14 @@ class OllamaProvider(LLMProvider):
         self,
         model: str,
         messages: list[dict],
-        temperature: float = 0.7,
+        # 0.7 invites exactly the kind of hallucination that turned "pyramid" (a shape) into
+        # the unrelated Pyramid web framework: a small local model has much less capacity to
+        # recover from an early wrong turn than a frontier one, so the same "creative" setting
+        # that's fine for a large cloud model reads as unreliable here. Lower and more
+        # deterministic trades away creative variation for staying on-topic, which is the right
+        # default for code and factual answers — callers that actually want variety (there are
+        # none today) can still pass a higher value explicitly.
+        temperature: float = 0.3,
         usage_sink: dict | None = None,
     ) -> AsyncGenerator[str, None]:
         """Yields assistant content deltas as they stream from the local model.
@@ -87,7 +94,7 @@ class OllamaProvider(LLMProvider):
                             usage_sink["duration_ms"] = (chunk.get("total_duration") or 0) // 1_000_000
                         break
 
-    async def chat(self, model: str, messages: list[dict], temperature: float = 0.7) -> str:
+    async def chat(self, model: str, messages: list[dict], temperature: float = 0.3) -> str:
         parts = [part async for part in self.chat_stream(model, messages, temperature)]
         return "".join(parts)
 

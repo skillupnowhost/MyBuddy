@@ -51,6 +51,92 @@ def test_send_message_streams_and_persists(client, db_session):
         app.dependency_overrides.pop(get_llm_client, None)
 
 
+def test_delete_message_onward_removes_target_and_later_messages(client, db_session):
+    app.dependency_overrides[get_llm_client] = lambda: MockProvider(reply="reply")
+    try:
+        token = _register_and_login(client, email="frank@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        conversation_id = client.post("/api/v1/conversations", json={}, headers=headers).json()["id"]
+
+        # Two full turns, so there's a "later" turn to prove gets deleted too.
+        for content in ["first", "second"]:
+            with client.stream(
+                "POST",
+                f"/api/v1/conversations/{conversation_id}/messages",
+                json={"content": content},
+                headers=headers,
+            ) as resp:
+                assert resp.status_code == 200
+                "".join(resp.iter_text())
+
+        before = client.get(f"/api/v1/conversations/{conversation_id}/messages", headers=headers).json()
+        assert [m["content"] for m in before] == ["first", "reply", "second", "reply"]
+        first_message_id = before[0]["id"]
+
+        del_resp = client.delete(
+            f"/api/v1/conversations/{conversation_id}/messages/{first_message_id}/onward", headers=headers
+        )
+        assert del_resp.status_code == 204
+
+        after = client.get(f"/api/v1/conversations/{conversation_id}/messages", headers=headers).json()
+        assert after == []
+    finally:
+        app.dependency_overrides.pop(get_llm_client, None)
+
+
+def test_message_feedback_set_and_clear(client, db_session):
+    app.dependency_overrides[get_llm_client] = lambda: MockProvider(reply="reply")
+    try:
+        token = _register_and_login(client, email="ivy@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        conversation_id = client.post("/api/v1/conversations", json={}, headers=headers).json()["id"]
+        with client.stream(
+            "POST",
+            f"/api/v1/conversations/{conversation_id}/messages",
+            json={"content": "hi"},
+            headers=headers,
+        ) as resp:
+            assert resp.status_code == 200
+            "".join(resp.iter_text())
+
+        messages = client.get(f"/api/v1/conversations/{conversation_id}/messages", headers=headers).json()
+        assistant_id = next(m["id"] for m in messages if m["role"] == "assistant")
+
+        up = client.patch(
+            f"/api/v1/conversations/{conversation_id}/messages/{assistant_id}",
+            json={"feedback": "up"},
+            headers=headers,
+        )
+        assert up.status_code == 200
+        assert up.json()["feedback"] == "up"
+
+        cleared = client.patch(
+            f"/api/v1/conversations/{conversation_id}/messages/{assistant_id}",
+            json={"feedback": None},
+            headers=headers,
+        )
+        assert cleared.status_code == 200
+        assert cleared.json()["feedback"] is None
+    finally:
+        app.dependency_overrides.pop(get_llm_client, None)
+
+
+def test_delete_message_onward_requires_ownership(client):
+    token_a = _register_and_login(client, email="grace@example.com")
+    token_b = _register_and_login(client, email="heidi@example.com")
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+
+    conversation_id = client.post("/api/v1/conversations", json={}, headers=headers_a).json()["id"]
+
+    resp = client.delete(
+        f"/api/v1/conversations/{conversation_id}/messages/{conversation_id}/onward", headers=headers_b
+    )
+    assert resp.status_code == 404
+
+
 def test_list_models(client):
     app.dependency_overrides[get_llm_client] = lambda: MockProvider(models=["llama3.2:1b"])
     try:

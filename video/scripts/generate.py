@@ -148,6 +148,20 @@ def main() -> int:
         update_job(engine, args.job_id, status="FAILED", error_message=message, completed_at=datetime.now(timezone.utc))
         print(message, file=sys.stderr)
         return 1
+    except MemoryError:
+        # Expected on this project's primary dev machine (no GPU, ~7GB RAM) — see
+        # video/README.md's "Hardware reality check". Loading a ~1.7B-parameter diffusion
+        # model at float32 needs several GB just for weights; report that plainly instead of
+        # a raw traceback ending in "MemoryError" with no context.
+        message = (
+            f"Ran out of memory loading '{args.model}'. Text-to-video models need far more "
+            "RAM (or a GPU with enough VRAM) than this machine has available — see "
+            "video/README.md's hardware note. This isn't fixable by retrying; it needs "
+            "more RAM/VRAM or a smaller model."
+        )
+        update_job(engine, args.job_id, status="FAILED", error_message=message, completed_at=datetime.now(timezone.utc))
+        print(message, file=sys.stderr)
+        return 1
     except Exception as exc:  # noqa: BLE001 - any generation failure must be reported, not raised into the void
         message = f"{exc}\n{traceback.format_exc()}"[:4000]
         update_job(engine, args.job_id, status="FAILED", error_message=message, completed_at=datetime.now(timezone.utc))

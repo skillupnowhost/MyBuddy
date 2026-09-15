@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AuthedImage from "@/components/AuthedImage";
+import { LoadingGrid } from "@/components/LoadingIcons";
 import MaskCanvas, { type MaskCanvasHandle } from "@/components/MaskCanvas";
 import { isLoggedIn } from "@/lib/auth";
 import { createEditJob, listEditJobs, pollEditJob } from "@/lib/imageEdit";
@@ -131,7 +132,7 @@ export default function ImageEditPage() {
       (operation === "OUTPAINT" && prompt.trim().length > 0 && (padTop || padBottom || padLeft || padRight) > 0));
 
   return (
-    <div className="min-h-screen bg-[#f4f5f9] px-6 py-8 text-gray-900">
+    <div className="min-h-screen bg-white px-6 py-8 text-gray-900">
       <div className="mx-auto max-w-3xl">
         <div className="mb-2 flex items-center justify-between">
           <h1 className="text-2xl font-semibold">MyBuddy Image Edit</h1>
@@ -266,10 +267,15 @@ export default function ImageEditPage() {
             {jobs.map((job) => (
               <div key={job.id} className="rounded-lg border border-gray-200 p-2">
                 {job.result_image_id ? (
-                  <AuthedImage imageId={job.result_image_id} className="mb-2 h-32 w-full rounded-lg object-cover" />
+                  <AuthedImage
+                    imageId={job.result_image_id}
+                    className="mb-2 h-32 w-full rounded-lg object-cover"
+                    downloadable
+                    downloadFilename="mybuddy-edited-image.png"
+                  />
                 ) : (
                   <div className="mb-2 flex h-32 w-full items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-400">
-                    {job.status === "FAILED" ? "failed" : "working..."}
+                    {job.status === "FAILED" ? "failed" : <LoadingGrid className="h-10 w-10" />}
                   </div>
                 )}
                 <p className="truncate text-xs text-gray-700">{job.operation}</p>

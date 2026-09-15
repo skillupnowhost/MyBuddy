@@ -16,6 +16,7 @@ from app.schemas.agent import AgentStepRead
 from app.schemas.arena import MaxModeCandidateRead
 from app.schemas.conversation import ConversationCreate, ConversationDetail, ConversationRead, ConversationUpdate
 from app.schemas.expert_pipeline import ExpertPipelineStepRead
+from app.schemas.message import MessageFeedbackUpdate, MessageRead
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -207,4 +208,56 @@ def delete_conversation(
 ):
     conversation = _get_owned_conversation(db, conversation_id, user)
     db.delete(conversation)
+    db.commit()
+
+
+@router.patch("/{conversation_id}/messages/{message_id}", response_model=MessageRead)
+def update_message_feedback(
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    payload: MessageFeedbackUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    conversation = _get_owned_conversation(db, conversation_id, user)
+    message = db.get(Message, message_id)
+    if message is None or message.conversation_id != conversation.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
+
+    message.feedback = payload.feedback
+    db.commit()
+    db.refresh(message)
+    return message
+
+
+@router.delete("/{conversation_id}/messages/{message_id}/onward", status_code=status.HTTP_204_NO_CONTENT)
+def delete_message_onward(
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Deletes the given message and every message after it in the same conversation
+    (ordered by created_at) — what "edit and resend" needs: discard the old turn (and
+    whatever the assistant said in reply) before the edited content is sent as a new
+    message, rather than leaving a stale exchange sitting in the middle of the history."""
+    conversation = _get_owned_conversation(db, conversation_id, user)
+    ordered = (
+        db.query(Message.id)
+        .filter(Message.conversation_id == conversation.id)
+        .order_by(Message.created_at.asc())
+        .all()
+    )
+    ordered_ids = [row[0] for row in ordered]
+    try:
+        target_index = ordered_ids.index(message_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found") from None
+
+    # Deletes by id, not by a created_at cutoff — comparing timestamps for ">= this one"
+    # is exactly the kind of thing that quietly behaves differently across database
+    # backends (string vs. native datetime comparison), where deleting by an explicit id
+    # list, computed once in Python from the same ordering the API returns, does not.
+    ids_to_delete = ordered_ids[target_index:]
+    db.query(Message).filter(Message.id.in_(ids_to_delete)).delete(synchronize_session=False)
     db.commit()

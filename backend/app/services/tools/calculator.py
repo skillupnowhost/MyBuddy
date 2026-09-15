@@ -32,7 +32,7 @@ class CalculatorTool(Tool):
     name = "calculator"
     description = 'Evaluates a basic arithmetic expression. Args: {"expression": "2 + 2 * 3"}'
 
-    def run(self, args: dict, context: ToolContext | None = None) -> str:
+    async def run(self, args: dict, context: ToolContext | None = None) -> str:
         expression = args.get("expression", "")
         try:
             tree = ast.parse(expression, mode="eval")

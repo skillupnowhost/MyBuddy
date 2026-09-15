@@ -131,7 +131,7 @@ export default function FinetunePage() {
   const validatedDatasets = datasets.filter((d) => d.status === "VALIDATED");
 
   return (
-    <div className="min-h-screen bg-[#f4f5f9] px-6 py-8 text-gray-900">
+    <div className="min-h-screen bg-white px-6 py-8 text-gray-900">
       <div className="mx-auto max-w-4xl">
         <div className="mb-2 flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Fine-tuning</h1>

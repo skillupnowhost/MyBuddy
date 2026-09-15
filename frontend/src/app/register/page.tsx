@@ -44,7 +44,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f4f5f9] px-4">
+    <div className="flex min-h-screen items-center justify-center bg-white px-4">
       <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 shadow-xl">
         <h1 className="mb-1 text-2xl font-semibold text-gray-900">MyBuddy</h1>
         <p className="mb-6 text-sm text-gray-500">Create your account.</p>

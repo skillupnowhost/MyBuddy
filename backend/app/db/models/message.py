@@ -17,6 +17,10 @@ class Message(Base):
     )
     role: Mapped[str] = mapped_column(String(20), nullable=False)  # "system" | "user" | "assistant"
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    # User feedback on an assistant reply — "up" | "down" | None. Nullable/unset by default;
+    # a user message is never expected to carry one, but nothing stops it at the DB level,
+    # same as other columns here that are conventionally role-scoped rather than enforced so.
+    feedback: Mapped[str | None] = mapped_column(String(10), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     conversation: Mapped["Conversation"] = relationship(back_populates="messages")

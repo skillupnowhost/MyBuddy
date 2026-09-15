@@ -31,6 +31,8 @@ export interface Message {
   sources?: Source[];
   toolCall?: string;
   images?: ImageItem[];
+  status?: "sending" | "failed";
+  feedback?: "up" | "down" | null;
 }
 
 export type DocumentStatus = "UPLOADING" | "PROCESSING" | "EMBEDDING" | "READY" | "FAILED";
@@ -192,6 +194,25 @@ export interface ImageGenerationJobItem {
   seed: number | null;
   status: ImageGenerationStatus;
   image_id: string | null;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export type VideoGenerationStatus = "PENDING" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
+
+export interface VideoGenerationJobItem {
+  id: string;
+  prompt: string;
+  negative_prompt: string | null;
+  width: number;
+  height: number;
+  num_frames: number;
+  fps: number;
+  steps: number;
+  seed: number | null;
+  status: VideoGenerationStatus;
+  video_id: string | null;
   error_message: string | null;
   created_at: string;
   completed_at: string | null;

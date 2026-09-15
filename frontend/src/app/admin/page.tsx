@@ -67,7 +67,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f5f9] px-6 py-8 text-gray-900">
+    <div className="min-h-screen bg-white px-6 py-8 text-gray-900">
       <div className="mx-auto max-w-4xl">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Admin</h1>

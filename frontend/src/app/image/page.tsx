@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AuthedImage from "@/components/AuthedImage";
+import { LoadingGrid } from "@/components/LoadingIcons";
 import { isLoggedIn } from "@/lib/auth";
 import { cancelGenerationJob, createGenerationJob, listGenerationJobs, pollGenerationJob } from "@/lib/imageGeneration";
 import type { ImageGenerationJobItem } from "@/lib/types";
@@ -92,7 +93,7 @@ export default function ImagePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f5f9] px-6 py-8 text-gray-900">
+    <div className="min-h-screen bg-white px-6 py-8 text-gray-900">
       <div className="mx-auto max-w-3xl">
         <div className="mb-2 flex items-center justify-between">
           <h1 className="text-2xl font-semibold">MyBuddy Image</h1>
@@ -167,10 +168,15 @@ export default function ImagePage() {
             {jobs.map((job) => (
               <div key={job.id} className="rounded-lg border border-gray-200 p-2">
                 {job.image_id ? (
-                  <AuthedImage imageId={job.image_id} className="mb-2 h-32 w-full rounded-lg object-cover" />
+                  <AuthedImage
+                    imageId={job.image_id}
+                    className="mb-2 h-32 w-full rounded-lg object-cover"
+                    downloadable
+                    downloadFilename={`${job.prompt.slice(0, 40).replace(/[^a-z0-9]+/gi, "-") || "mybuddy-image"}.png`}
+                  />
                 ) : (
                   <div className="mb-2 flex h-32 w-full items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-400">
-                    {job.status === "FAILED" ? "failed" : "generating..."}
+                    {job.status === "FAILED" ? "failed" : <LoadingGrid className="h-10 w-10" />}
                   </div>
                 )}
                 <p className="truncate text-xs text-gray-700" title={job.prompt}>

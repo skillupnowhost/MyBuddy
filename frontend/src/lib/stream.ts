@@ -1,7 +1,16 @@
 import { apiFetch } from "./api";
 import type { Source } from "./types";
 
-const CHAT_REQUEST_TIMEOUT_MS = 45_000;
+// An IDLE timeout (resets on every chunk received), not a total-request timeout — a short
+// chat reply and a long generated document both stream for very different total durations,
+// but both should only be killed if the connection actually goes quiet, not because the
+// whole thing took longer than some fixed wall-clock budget. Generous on purpose: on
+// CPU-only local inference, first-token latency for a long or complex prompt can genuinely
+// run past a minute — a tight timeout here doesn't recover anything, it just fires the retry
+// in sendMessage while the original request may still be working, which is how a slow model
+// turns into "sent multiple times, no reply ever arrives" (see chat/page.tsx's
+// userMessagePersisted guard for the other half of that fix).
+const IDLE_TIMEOUT_MS = 120_000;
 
 export async function streamChatMessage(
   conversationId: string,
@@ -11,13 +20,20 @@ export async function streamChatMessage(
   onSources?: (sources: Source[]) => void,
   onToolCall?: (toolName: string) => void,
   imageIds?: string[],
+  onImage?: (imageId: string) => void,
+  onUserMessageId?: (id: string) => void,
 ): Promise<void> {
   const timeoutController = new AbortController();
   let timedOut = false;
-  const timeoutId = window.setTimeout(() => {
-    timedOut = true;
-    timeoutController.abort();
-  }, CHAT_REQUEST_TIMEOUT_MS);
+  let idleTimeoutId = 0;
+  const resetIdleTimer = () => {
+    window.clearTimeout(idleTimeoutId);
+    idleTimeoutId = window.setTimeout(() => {
+      timedOut = true;
+      timeoutController.abort();
+    }, IDLE_TIMEOUT_MS);
+  };
+  resetIdleTimer();
   const abortFromCaller = () => timeoutController.abort();
   signal?.addEventListener("abort", abortFromCaller, { once: true });
 
@@ -40,6 +56,7 @@ export async function streamChatMessage(
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
+      resetIdleTimer();
       buffer += decoder.decode(value, { stream: true });
 
       const lines = buffer.split("\n\n");
@@ -54,6 +71,8 @@ export async function streamChatMessage(
         if (payload.error) throw new Error(payload.error);
         if (payload.sources) onSources?.(payload.sources);
         if (payload.tool_call) onToolCall?.(payload.tool_call);
+        if (payload.image_id) onImage?.(payload.image_id);
+        if (payload.user_message_id) onUserMessageId?.(payload.user_message_id);
         if (payload.delta) onDelta(payload.delta);
         if (payload.done) {
           completed = true;
@@ -63,10 +82,10 @@ export async function streamChatMessage(
     }
     if (!completed) throw new Error("The chat stream ended before MyBuddy finished responding.");
   } catch (error) {
-    if (timedOut) throw new Error("MyBuddy did not respond within 45 seconds. Check that Ollama is running and try again.");
+    if (timedOut) throw new Error("MyBuddy stopped responding. Check that Ollama is running and try again.");
     throw error;
   } finally {
-    window.clearTimeout(timeoutId);
+    window.clearTimeout(idleTimeoutId);
     signal?.removeEventListener("abort", abortFromCaller);
   }
 }

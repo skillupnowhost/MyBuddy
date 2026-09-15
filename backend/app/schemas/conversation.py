@@ -11,7 +11,7 @@ class ConversationCreate(BaseModel):
     system_prompt: str | None = None
     model: str | None = None
     rag_enabled: bool = False
-    tools_enabled: bool = False
+    tools_enabled: bool = True
     max_mode_enabled: bool = False
     expert_pipeline_enabled: bool = False
     agent_mode_enabled: bool = False

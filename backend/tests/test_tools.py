@@ -4,22 +4,25 @@ from app.services.tools import maybe_run_tool_call
 from app.services.tools.calculator import CalculatorTool
 
 
-def test_calculator_evaluates_basic_expression():
+@pytest.mark.asyncio
+async def test_calculator_evaluates_basic_expression():
     tool = CalculatorTool()
-    assert tool.run({"expression": "2 + 2 * 3"}) == "8"
+    assert await tool.run({"expression": "2 + 2 * 3"}) == "8"
 
 
-def test_calculator_rejects_code_injection():
+@pytest.mark.asyncio
+async def test_calculator_rejects_code_injection():
     tool = CalculatorTool()
     # Anything beyond numeric literals + arithmetic operators must be rejected outright —
     # this must never become a general eval().
-    result = tool.run({"expression": "__import__('os').system('echo pwned')"})
+    result = await tool.run({"expression": "__import__('os').system('echo pwned')"})
     assert result.startswith("Error")
 
 
-def test_calculator_rejects_name_lookup():
+@pytest.mark.asyncio
+async def test_calculator_rejects_name_lookup():
     tool = CalculatorTool()
-    result = tool.run({"expression": "open('secret.txt').read()"})
+    result = await tool.run({"expression": "open('secret.txt').read()"})
     assert result.startswith("Error")
 
 

@@ -233,7 +233,7 @@ export default function CodePage() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-[#f4f5f9] text-gray-900">
+    <div className="flex h-screen flex-col bg-white text-gray-900">
       <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
         <h1 className="text-lg font-semibold">MyBuddy Code</h1>
         <Link href="/chat" className="text-sm text-indigo-600 hover:underline">

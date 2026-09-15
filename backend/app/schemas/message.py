@@ -20,4 +20,9 @@ class MessageRead(BaseModel):
     role: Literal["system", "user", "assistant"]
     content: str
     images: list[ImageRead] = []
+    feedback: Literal["up", "down"] | None = None
     created_at: datetime
+
+
+class MessageFeedbackUpdate(BaseModel):
+    feedback: Literal["up", "down"] | None = None
