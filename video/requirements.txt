@@ -19,6 +19,14 @@ safetensors==0.4.5
 sqlalchemy==2.0.36
 psycopg[binary]==3.2.3
 
-# Frame sequence -> mp4 encoding (diffusers.utils.export_to_video).
+# Frame sequence -> mp4 encoding (diffusers.utils.export_to_video, and edit_video.py's
+# frame-by-frame reader/writer).
 imageio==2.36.1
 imageio-ffmpeg==0.5.1
+pillow==11.0.0
+numpy==2.1.3
+
+# edit_video.py's REMOVE_BACKGROUND operation — CPU-only onnxruntime, no conflict with the
+# torch/diffusers stack above. Unlike generation, this one actually completes on CPU-only
+# hardware once this venv is provisioned; see README.md.
+rembg==2.0.61

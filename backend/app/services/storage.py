@@ -19,6 +19,11 @@ _SAFE_IMAGE_EXTENSIONS = {
     "image/gif": ".gif",
 }
 
+_SAFE_VIDEO_EXTENSIONS = {
+    "video/mp4": ".mp4",
+    "video/webm": ".webm",
+}
+
 
 def _save(user_id: str, subdir: str, extension: str, content: bytes) -> str:
     user_dir = os.path.join(settings.storage_dir, subdir, user_id)
@@ -45,6 +50,16 @@ def save_image(user_id: str, content_type: str, content: bytes) -> str:
     """Saves an uploaded image, same isolation rules as save_upload."""
     extension = _SAFE_IMAGE_EXTENSIONS.get(content_type, "")
     return _save(user_id, "images", extension, content)
+
+
+def save_video(user_id: str, content_type: str, content: bytes) -> str:
+    """Saves an uploaded video, same isolation rules as save_upload. Stored under
+    'videos/<user_id>' — the same subdir the video-generation subprocess writes generated
+    output to (see video/scripts/generate.py:save_generated_video), so uploaded and
+    generated videos are indistinguishable in storage layout, only in how the `videos` row
+    was created."""
+    extension = _SAFE_VIDEO_EXTENSIONS.get(content_type, "")
+    return _save(user_id, "videos", extension, content)
 
 
 def delete_upload(storage_path: str) -> None:

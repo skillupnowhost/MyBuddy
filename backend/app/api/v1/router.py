@@ -22,6 +22,7 @@ from app.api.v1.endpoints import (
     storyboard,
     training,
     vector,
+    video_edit,
     video_generation,
     videos,
     workspaces,
@@ -47,6 +48,7 @@ api_router.include_router(motion.router)
 api_router.include_router(creative.router)
 api_router.include_router(videos.router)
 api_router.include_router(video_generation.router)
+api_router.include_router(video_edit.router)
 api_router.include_router(storyboard.router)
 api_router.include_router(characters.router)
 api_router.include_router(world_bibles.router)

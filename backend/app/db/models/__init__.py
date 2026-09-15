@@ -39,6 +39,7 @@ from app.db.models.world_bible import WorldBible
 from app.db.models.camera_plan import CameraPlan
 from app.db.models.model_3d import Model3D
 from app.db.models.model_3d_generation_job import Model3DGenerationJob
+from app.db.models.video_edit_job import VideoEditJob
 
 __all__ = [
     "User",
@@ -82,4 +83,5 @@ __all__ = [
     "CameraPlan",
     "Model3D",
     "Model3DGenerationJob",
+    "VideoEditJob",
 ]

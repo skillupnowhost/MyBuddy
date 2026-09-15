@@ -99,6 +99,16 @@ class Settings(BaseSettings):
     video_gen_max_num_frames: int = 64
     video_gen_fps: int = 8
 
+    # --- Video upload + editing (green screen / background removal, spec §18-20) ---
+    # Background removal via rembg (already a real, CPU-fast dependency for Image Edit) is
+    # the one video-track capability that actually runs on this project's hardware — no
+    # diffusion, no GPU requirement. Upload is needed as an entry point since video
+    # generation itself can't produce real footage here.
+    max_video_size_bytes: int = 100 * 1024 * 1024  # 100MB
+    allowed_video_content_types: tuple[str, ...] = ("video/mp4", "video/webm")
+    video_edit_bg_removal_model: str = "u2net"
+    video_edit_default_background_color: str = "#00b140"  # chroma-key green
+
     # --- MyBuddy CG: text/image -> 3D mesh generation (video/CG/VFX spec §11-13) ---
     # Shap-E via diffusers — text-to-3D and image-to-3D through the same library already
     # used for Image/Video, rather than a new ML stack. Same CPU-hardware caveat as

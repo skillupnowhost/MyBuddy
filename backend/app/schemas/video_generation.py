@@ -45,8 +45,8 @@ class VideoRead(BaseModel):
 
     id: uuid.UUID
     content_type: str
-    width: int
-    height: int
-    duration_seconds: float
+    width: int | None
+    height: int | None
+    duration_seconds: float | None
     size_bytes: int
     created_at: datetime
