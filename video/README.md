@@ -15,10 +15,16 @@ Different situation for each script in this directory:
   ~7GB RAM. A diffusion model denoises a whole sequence of frames, not one image, so CPU
   generation time scales with `num_frames` on top of `steps` — architecture-complete, not a
   "coming soon" stub, but not runnable here in any practical sense.
-- **`edit_video.py`** (`REMOVE_BACKGROUND` / green screen): uses `rembg`, the same CPU-fast,
-  GPU-independent library already used by `imagegen/edit_image.py` — **this one actually
-  completes on this project's hardware** once `video/.venv` is provisioned, no GPU required.
-  The one video-track capability in this repo without a hardware caveat.
+- **`edit_video.py`**: four operations, mixed hardware story:
+  - `REMOVE_BACKGROUND` (green screen) and `REPLACE_ENVIRONMENT` (composite onto a provided
+    background image) both use `rembg`, the same CPU-fast, GPU-independent library already
+    used by `imagegen/edit_image.py` — **actually complete on this project's hardware** once
+    `video/.venv` is provisioned, no GPU required.
+  - `COLOR_GRADE` applies one of 8 fixed presets (CINEMATIC/VINTAGE/WARM/COLD/
+    BLACK_AND_WHITE/NOIR/VIVID/MUTED) via classical PIL image processing (brightness/
+    contrast/saturation + a channel-based temperature shift) — no ML model, also CPU-fast.
+  - `REMOVE_OBJECT` reuses the SD inpainting pipeline (GPU-heavy, same caveat as
+    `generate.py`) applied per-frame with one static mask.
 
 ## Setup (only needed once, ideally on a GPU-equipped machine)
 

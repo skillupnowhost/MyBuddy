@@ -25,6 +25,7 @@ def launch_video_edit_job(
     negative_prompt: str | None = None,
     steps: int | None = None,
     background_image_path: str | None = None,
+    color_preset: str | None = None,
 ) -> subprocess.Popen:
     """Launches video editing as a genuinely separate OS process — same reasoning as
     video_generation_service.launch_video_generation_job. Shares video/'s venv (edit_video.py
@@ -60,6 +61,8 @@ def launch_video_edit_job(
         command += ["--steps", str(steps)]
     if background_image_path:
         command += ["--background-image-path", background_image_path]
+    if color_preset:
+        command += ["--color-preset", color_preset]
 
     return subprocess.Popen(
         command,

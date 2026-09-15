@@ -1,4 +1,5 @@
 import io
+import os
 
 from app.services.video_edit_service import launch_video_edit_job
 
@@ -283,3 +284,67 @@ def test_replace_environment_rejects_other_users_background_image(client, monkey
         headers=headers_a,
     )
     assert resp.status_code == 404
+
+
+# --- COLOR_GRADE -----------------------------------------------------------------------------
+
+
+def test_color_grade_requires_preset(client):
+    token = _register_and_login(client, "video-edit-grade-missing@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    video = _upload_video(client, headers).json()
+
+    resp = client.post(
+        "/api/v1/video-edit", json={"operation": "COLOR_GRADE", "source_video_id": video["id"]}, headers=headers
+    )
+    assert resp.status_code == 422
+
+
+def test_color_grade_rejects_unknown_preset(client):
+    token = _register_and_login(client, "video-edit-grade-unknown@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    video = _upload_video(client, headers).json()
+
+    resp = client.post(
+        "/api/v1/video-edit",
+        json={"operation": "COLOR_GRADE", "source_video_id": video["id"], "color_preset": "SEPIA_DELUXE"},
+        headers=headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_color_grade_job_created_with_preset(client, monkeypatch):
+    monkeypatch.setattr("app.api.v1.endpoints.video_edit.launch_video_edit_job", lambda *a, **k: None)
+    token = _register_and_login(client, "video-edit-grade-user@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    video = _upload_video(client, headers).json()
+
+    resp = client.post(
+        "/api/v1/video-edit",
+        json={"operation": "COLOR_GRADE", "source_video_id": video["id"], "color_preset": "CINEMATIC"},
+        headers=headers,
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["operation"] == "COLOR_GRADE"
+    assert body["color_preset"] == "CINEMATIC"
+
+
+def test_color_grade_presets_match_between_backend_and_subprocess():
+    """The Literal in the schema and the _COLOR_GRADE_PRESETS dict in the subprocess script
+    are deliberately duplicated (separate Python environments) rather than shared — this test
+    is the guardrail that keeps them from silently drifting apart."""
+    import re
+
+    from app.schemas.video_edit import ColorGradePreset
+
+    schema_presets = set(ColorGradePreset.__args__)
+
+    script_path = os.path.join(os.path.dirname(__file__), "..", "..", "video", "scripts", "edit_video.py")
+    with open(script_path, encoding="utf-8") as f:
+        script_source = f.read()
+    match = re.search(r"_COLOR_GRADE_PRESETS = \{(.*?)\n\}", script_source, re.DOTALL)
+    assert match is not None
+    script_presets = set(re.findall(r'"([A-Z_]+)":\s*\{', match.group(1)))
+
+    assert schema_presets == script_presets

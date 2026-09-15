@@ -169,6 +169,80 @@ def run_replace_environment(args) -> tuple[str, int, int, float]:
     return temp_path, width, height, duration_seconds
 
 
+# Classical per-frame color grading (spec §24/§29): a fixed preset library, not arbitrary
+# custom-LUT support. Each value is a delta/multiplier applied via PIL's ImageEnhance
+# (brightness/contrast/saturation, 1.0 = unchanged) plus a manual (red, blue) channel shift
+# for warm/cool temperature — no ML model, honestly labeled as classical grading. Keep this
+# dict's keys in sync with backend/app/schemas/video_edit.py's ColorGradePreset literal.
+_COLOR_GRADE_PRESETS = {
+    "CINEMATIC": {"brightness": 0.95, "contrast": 1.15, "saturation": 0.9, "temperature": (5, -5), "grayscale": False},
+    "VINTAGE": {"brightness": 1.0, "contrast": 0.9, "saturation": 0.7, "temperature": (12, -12), "grayscale": False},
+    "WARM": {"brightness": 1.0, "contrast": 1.0, "saturation": 1.05, "temperature": (15, -10), "grayscale": False},
+    "COLD": {"brightness": 1.0, "contrast": 1.0, "saturation": 1.0, "temperature": (-15, 15), "grayscale": False},
+    "BLACK_AND_WHITE": {"brightness": 1.0, "contrast": 1.05, "saturation": 0.0, "temperature": (0, 0), "grayscale": True},
+    "NOIR": {"brightness": 0.85, "contrast": 1.4, "saturation": 0.0, "temperature": (0, 0), "grayscale": True},
+    "VIVID": {"brightness": 1.05, "contrast": 1.15, "saturation": 1.4, "temperature": (0, 0), "grayscale": False},
+    "MUTED": {"brightness": 1.0, "contrast": 0.9, "saturation": 0.55, "temperature": (0, 0), "grayscale": False},
+}
+
+
+def _apply_color_grade(frame_image, preset: dict):
+    import numpy as np
+    from PIL import Image, ImageEnhance
+
+    graded = ImageEnhance.Brightness(frame_image).enhance(preset["brightness"])
+    graded = ImageEnhance.Contrast(graded).enhance(preset["contrast"])
+    graded = ImageEnhance.Color(graded).enhance(preset["saturation"])
+
+    red_shift, blue_shift = preset["temperature"]
+    if red_shift or blue_shift:
+        array = np.array(graded).astype(np.int16)
+        array[:, :, 0] = np.clip(array[:, :, 0] + red_shift, 0, 255)
+        array[:, :, 2] = np.clip(array[:, :, 2] + blue_shift, 0, 255)
+        graded = Image.fromarray(array.astype(np.uint8))
+
+    if preset["grayscale"]:
+        graded = graded.convert("L").convert("RGB")
+
+    return graded
+
+
+def run_color_grade(args) -> tuple[str, int, int, float]:
+    """Applies one fixed color-grade preset to every frame — classical image processing
+    (PIL ImageEnhance + a numpy channel shift), no ML model, so this is CPU-fast like
+    REMOVE_BACKGROUND/REPLACE_ENVIRONMENT rather than GPU-heavy like generation/REMOVE_OBJECT."""
+    import tempfile
+
+    import imageio
+    import numpy as np
+    from PIL import Image
+
+    preset = _COLOR_GRADE_PRESETS[args.color_preset]
+
+    reader = imageio.get_reader(args.source_video_path)
+    meta = reader.get_meta_data()
+    fps = meta.get("fps", 24)
+
+    fd, temp_path = tempfile.mkstemp(suffix=".mp4")
+    os.close(fd)
+    writer = imageio.get_writer(temp_path, fps=fps)
+    width = height = 0
+    frame_count = 0
+    try:
+        for frame in reader:
+            source_frame = Image.fromarray(frame).convert("RGB")
+            width, height = source_frame.size
+            graded = _apply_color_grade(source_frame, preset)
+            writer.append_data(np.array(graded))
+            frame_count += 1
+    finally:
+        writer.close()
+        reader.close()
+
+    duration_seconds = frame_count / fps if fps else 0.0
+    return temp_path, width, height, duration_seconds
+
+
 def run_remove_object(args) -> tuple[str, int, int, float]:
     """Reads the source video frame by frame and inpaints the same static mask on every
     frame via a Stable Diffusion inpainting pipeline (same model/API as
@@ -220,7 +294,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--job-id", required=True)
     parser.add_argument("--user-id", required=True)
-    parser.add_argument("--operation", required=True, choices=["REMOVE_BACKGROUND", "REMOVE_OBJECT", "REPLACE_ENVIRONMENT"])
+    parser.add_argument(
+        "--operation",
+        required=True,
+        choices=["REMOVE_BACKGROUND", "REMOVE_OBJECT", "REPLACE_ENVIRONMENT", "COLOR_GRADE"],
+    )
     parser.add_argument("--source-video-path", required=True)
     parser.add_argument("--background-color", default="#00b140")
     parser.add_argument("--background-image-path", default=None)
@@ -230,6 +308,7 @@ def main() -> int:
     parser.add_argument("--negative-prompt", default=None)
     parser.add_argument("--steps", type=int, default=20)
     parser.add_argument("--inpaint-model", default="runwayml/stable-diffusion-inpainting")
+    parser.add_argument("--color-preset", default=None, choices=list(_COLOR_GRADE_PRESETS))
     parser.add_argument("--storage-dir", required=True)
     parser.add_argument("--database-url", required=True)
     args = parser.parse_args()
@@ -240,6 +319,9 @@ def main() -> int:
     if args.operation == "REPLACE_ENVIRONMENT" and not args.background_image_path:
         print("REPLACE_ENVIRONMENT requires --background-image-path.", file=sys.stderr)
         return 1
+    if args.operation == "COLOR_GRADE" and not args.color_preset:
+        print("COLOR_GRADE requires --color-preset.", file=sys.stderr)
+        return 1
 
     engine = create_engine(args.database_url)
     update_job(engine, args.job_id, status="RUNNING")
@@ -249,6 +331,8 @@ def main() -> int:
             temp_path, width, height, duration_seconds = run_remove_object(args)
         elif args.operation == "REPLACE_ENVIRONMENT":
             temp_path, width, height, duration_seconds = run_replace_environment(args)
+        elif args.operation == "COLOR_GRADE":
+            temp_path, width, height, duration_seconds = run_color_grade(args)
         else:
             temp_path, width, height, duration_seconds = run_remove_background(args)
         video_id = save_result_video(engine, args.user_id, args.storage_dir, temp_path, width, height, duration_seconds)

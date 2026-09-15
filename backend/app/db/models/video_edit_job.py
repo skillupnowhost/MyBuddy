@@ -14,8 +14,11 @@ from app.db.types import GUID
 # REMOVE_OBJECT reuses the same SD inpainting pipeline as ImageEditJob's INPAINT, applied
 # frame-by-frame with one static mask — same GPU/CPU-hardware caveat as generation (spec §21
 # AI Object Removal; per-frame *tracking* of a moving object/mask is explicitly out of scope
-# for v1, see video/README.md).
-VIDEO_EDIT_OPERATIONS = ("REMOVE_BACKGROUND", "REMOVE_OBJECT", "REPLACE_ENVIRONMENT")
+# for v1, see video/README.md). COLOR_GRADE is classical per-frame color adjustment (PIL
+# ImageEnhance + a channel-based temperature shift, no ML model) — honestly labeled as
+# classical grading, not neural relighting (spec §24/§29 explicitly ask for named cinematic
+# presets/LUTs, which is how real color grading actually works).
+VIDEO_EDIT_OPERATIONS = ("REMOVE_BACKGROUND", "REMOVE_OBJECT", "REPLACE_ENVIRONMENT", "COLOR_GRADE")
 VIDEO_EDIT_JOB_STATUSES = ("PENDING", "RUNNING", "COMPLETED", "FAILED", "CANCELLED")
 
 
@@ -45,6 +48,8 @@ class VideoEditJob(Base):
     prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
     negative_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
     steps: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # COLOR_GRADE only: one of color_grade_service.COLOR_GRADE_PRESETS.
+    color_preset: Mapped[str | None] = mapped_column(String(30), nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING")
     result_video_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID(), ForeignKey("videos.id", ondelete="SET NULL"), nullable=True
