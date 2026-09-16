@@ -28,3 +28,16 @@ class Image(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     message: Mapped["Message"] = relationship(back_populates="images")
+    # One-directional FK lives on ImageGenerationJob (job.image_id -> images.id); this is a
+    # read-only reverse lookup so ImageRead can expose the prompt that produced this image.
+    generation_job: Mapped["ImageGenerationJob | None"] = relationship(
+        "ImageGenerationJob",
+        primaryjoin="Image.id==ImageGenerationJob.image_id",
+        foreign_keys="ImageGenerationJob.image_id",
+        uselist=False,
+        viewonly=True,
+    )
+
+    @property
+    def prompt(self) -> str | None:
+        return self.generation_job.prompt if self.generation_job else None

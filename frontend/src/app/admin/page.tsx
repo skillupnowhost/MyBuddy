@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Settings } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
+import PageBlobBackground from "@/components/PageBlobBackground";
 import { getAdminStats, getCurrentUser, getSystemHealth, listAdminUsers, updateUserRole } from "@/lib/admin";
 import { isLoggedIn } from "@/lib/auth";
 import type { AdminStats, AdminUserItem, SystemHealth } from "@/lib/types";
 
 function StatCard({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:shadow-md">
       <p className="text-2xl font-semibold text-gray-900">{value}</p>
       <p className="text-xs text-gray-500">{label}</p>
     </div>
@@ -67,16 +69,14 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white px-6 py-8 text-gray-900">
+    <div className="relative min-h-screen bg-white px-6 py-8 text-gray-900">
+      <PageBlobBackground />
       <div className="mx-auto max-w-4xl">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Admin</h1>
-          <Link href="/chat" className="text-sm text-indigo-600 hover:underline">
-            &larr; Back to chat
-          </Link>
-        </div>
+        <PageHeader icon={Settings} title="Admin" description="Manage users, monitor system health, and review platform stats." />
 
-        {error && <p className="mb-4 text-sm text-red-500">{error}</p>}
+        {error && (
+          <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        )}
 
         {stats && (
           <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
@@ -90,7 +90,7 @@ export default function AdminPage() {
         )}
 
         {health && (
-          <div className="mb-8 rounded-xl border border-gray-200 bg-white p-4">
+          <div className="mb-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md">
             <h2 className="mb-3 text-sm font-medium text-gray-700">System health</h2>
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
@@ -131,7 +131,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md">
           <h2 className="mb-3 text-sm font-medium text-gray-700">Users</h2>
           <div className="space-y-1">
             {users.map((user) => (

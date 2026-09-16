@@ -10,6 +10,7 @@ export default function AuthedImage({
   alt = "attached image",
   downloadable = false,
   downloadFilename,
+  onOpen,
 }: {
   imageId: string;
   className?: string;
@@ -17,6 +18,9 @@ export default function AuthedImage({
   /** Shows a hover download button that saves the already-loaded image bytes — no re-fetch. */
   downloadable?: boolean;
   downloadFilename?: string;
+  /** When provided, the image becomes clickable (cursor-zoom-in) and is passed the already-
+   * loaded blob src — the caller owns opening a MediaLightbox with it (no re-fetch needed). */
+  onOpen?: (src: string) => void;
 }) {
   const [src, setSrc] = useState<string | null>(null);
 
@@ -45,15 +49,15 @@ export default function AuthedImage({
     return <div className={`animate-pulse rounded-lg bg-gray-200 ${className ?? "h-24 w-24"}`} />;
   }
 
-  if (!downloadable) {
-    // eslint-disable-next-line @next/next/no-img-element -- a blob: URL can't go through next/image's loader
-    return <img src={src} alt={alt} className={className ?? "h-24 w-24 rounded-lg object-cover"} />;
-  }
+  const imgClassName = `${className ?? "h-24 w-24 rounded-lg object-cover"} ${onOpen ? "cursor-zoom-in" : ""}`;
+  // eslint-disable-next-line @next/next/no-img-element -- a blob: URL can't go through next/image's loader
+  const img = <img src={src} alt={alt} className={imgClassName} onClick={onOpen ? () => onOpen(src) : undefined} />;
+
+  if (!downloadable) return img;
 
   return (
     <div className="group/img relative inline-block">
-      {/* eslint-disable-next-line @next/next/no-img-element -- a blob: URL can't go through next/image's loader */}
-      <img src={src} alt={alt} className={className ?? "h-24 w-24 rounded-lg object-cover"} />
+      {img}
       <button
         onClick={(e) => {
           e.stopPropagation();

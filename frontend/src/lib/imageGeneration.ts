@@ -29,6 +29,12 @@ export function cancelGenerationJob(id: string): Promise<ImageGenerationJobItem>
   return apiJson<ImageGenerationJobItem>(`/api/v1/image-generation/${id}/cancel`, { method: "POST" });
 }
 
+/** Removes a finished job's row server-side — used to auto-clean a FAILED job so it doesn't
+ * sit around forever (see pollGenerationJob callers in QuickCreatePanel and /image). */
+export function deleteGenerationJob(id: string): Promise<void> {
+  return apiJson<void>(`/api/v1/image-generation/${id}`, { method: "DELETE" });
+}
+
 const TERMINAL_STATUSES = new Set(["COMPLETED", "FAILED", "CANCELLED"]);
 
 /** Same self-scheduling poll-until-terminal-status shape as code.ts::pollExecution. */

@@ -108,6 +108,24 @@ body {
   }
 }
 
+/* Slow ambient drift for the decorative gradient blobs behind tool pages (see
+   components/PageBlobBackground.tsx) — deliberately subtle and slow so it reads as "alive"
+   rather than distracting from the foreground content. */
+@keyframes blob-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(3%, 4%) scale(1.05); }
+  66% { transform: translate(-3%, 2%) scale(0.97); }
+}
+.animate-blob-drift {
+  animation: blob-drift 18s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-blob-drift {
+    animation: none;
+  }
+}
+
 /* Stretches a raw, hardcoded SVG icon (see components/LoadingIcons.tsx) to fill its wrapper
    regardless of that SVG's own native width/height/viewBox. */
 .loading-icon-raw svg {

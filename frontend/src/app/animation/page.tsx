@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Film } from "lucide-react";
+import WorkspaceHeader from "@/components/WorkspaceHeader";
 import {
   createAnimationDocument,
   deleteAnimationDocument,
@@ -120,12 +121,7 @@ export default function AnimationPage() {
 
   return (
     <div className="flex h-screen flex-col bg-white text-gray-900">
-      <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
-        <h1 className="text-lg font-semibold">MyBuddy Animator</h1>
-        <Link href="/chat" className="text-sm text-indigo-600 hover:underline">
-          &larr; Back to chat
-        </Link>
-      </div>
+      <WorkspaceHeader icon={Film} title="MyBuddy Animator" />
 
       {error && <p className="border-b border-gray-200 bg-red-50 px-4 py-2 text-sm text-red-500">{error}</p>}
 
@@ -171,7 +167,7 @@ export default function AnimationPage() {
           <button
             onClick={handleGenerate}
             disabled={!sourceDocId || !prompt.trim() || generating}
-            className="mb-4 w-full rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
+            className="mb-4 w-full rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:from-indigo-500 hover:to-violet-500 disabled:opacity-40"
           >
             {generating ? "Generating..." : "+ Generate animation"}
           </button>

@@ -84,8 +84,11 @@ async def maybe_run_code_and_format_output(reply: str) -> str | None:
         # showing that fragment as "the output" would be actively misleading, not just empty.
         return None
     if result.stdout.strip():
-        return f"\n\n**Output**\n```\n{result.stdout.strip()}\n```"
+        # Tagged "text", not bare — an untagged fence gets no `language-*` class from
+        # ReactMarkdown, so it would render as tiny inline code instead of the same
+        # syntax-highlighted, header-and-copy-button box as the code above it.
+        return f"\n\n**Output**\n```text\n{result.stdout.strip()}\n```"
     if result.stderr.strip():
         error_line = result.stderr.strip().splitlines()[-1]
-        return f"\n\n**Output**\n```\n{error_line}\n```"
+        return f"\n\n**Output**\n```text\n{error_line}\n```"
     return None

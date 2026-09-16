@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AlertTriangle, Wand2 } from "lucide-react";
 import AuthedImage from "@/components/AuthedImage";
 import { LoadingGrid } from "@/components/LoadingIcons";
 import MaskCanvas, { type MaskCanvasHandle } from "@/components/MaskCanvas";
+import MediaLightbox from "@/components/MediaLightbox";
+import PageHeader from "@/components/PageHeader";
+import PageBlobBackground from "@/components/PageBlobBackground";
 import { isLoggedIn } from "@/lib/auth";
-import { createEditJob, listEditJobs, pollEditJob } from "@/lib/imageEdit";
+import { createEditJob, deleteEditJob, listEditJobs, pollEditJob } from "@/lib/imageEdit";
 import { getImageBlobUrl, uploadImage } from "@/lib/images";
 import type { ImageEditJobItem, ImageEditOperation, ImageItem } from "@/lib/types";
 
@@ -37,13 +40,33 @@ export default function ImageEditPage() {
   const [padRight, setPadRight] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A failed edit shows here briefly (with the error and a one-click retry) instead of sitting
+  // in the gallery forever — the job row itself is deleted server-side the moment it's known to
+  // have failed, see watchJob below. Same pattern as /image/page.tsx and /video/page.tsx.
+  const [failedNotice, setFailedNotice] = useState<{ message: string; job: ImageEditJobItem } | null>(null);
+  const [lightbox, setLightbox] = useState<{ src: string; job: ImageEditJobItem } | null>(null);
   const maskRef = useRef<MaskCanvasHandle>(null);
   const unsubscribersRef = useRef<Map<string, () => void>>(new Map());
   const sourceInputRef = useRef<HTMLInputElement>(null);
+  const failedNoticeTimeoutRef = useRef<number | undefined>(undefined);
+
+  function reportFailure(job: ImageEditJobItem) {
+    deleteEditJob(job.id).catch(() => {});
+    setJobs((prev) => prev.filter((j) => j.id !== job.id));
+    window.clearTimeout(failedNoticeTimeoutRef.current);
+    setFailedNotice({ message: job.error_message || "Image edit failed.", job });
+    failedNoticeTimeoutRef.current = window.setTimeout(() => setFailedNotice(null), 8000);
+  }
 
   function watchJob(id: string) {
     if (unsubscribersRef.current.has(id)) return;
     const stop = pollEditJob(id, (updated) => {
+      if (updated.status === "FAILED") {
+        unsubscribersRef.current.get(id)?.();
+        unsubscribersRef.current.delete(id);
+        reportFailure(updated);
+        return;
+      }
       setJobs((prev) => prev.map((j) => (j.id === updated.id ? updated : j)));
       if (TERMINAL_STATUSES.has(updated.status)) {
         unsubscribersRef.current.get(id)?.();
@@ -60,8 +83,11 @@ export default function ImageEditPage() {
     }
     listEditJobs()
       .then((loaded) => {
-        setJobs(loaded);
-        loaded.filter((j) => !TERMINAL_STATUSES.has(j.status)).forEach((j) => watchJob(j.id));
+        const stale = loaded.filter((j) => j.status === "FAILED");
+        stale.forEach((j) => deleteEditJob(j.id).catch(() => {}));
+        const usable = loaded.filter((j) => j.status !== "FAILED");
+        setJobs(usable);
+        usable.filter((j) => !TERMINAL_STATUSES.has(j.status)).forEach((j) => watchJob(j.id));
       })
       .catch(() => setError("Could not load image edit jobs."));
 
@@ -69,9 +95,26 @@ export default function ImageEditPage() {
     return () => {
       unsubscribers.forEach((stop) => stop());
       unsubscribers.clear();
+      window.clearTimeout(failedNoticeTimeoutRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  // Deep link from another surface's "Edit image" action (e.g. /image's lightbox) — preload
+  // the source instead of requiring the user to download and re-upload the same file. Read
+  // straight from window.location rather than next/navigation's useSearchParams, which would
+  // force this client page into a Suspense boundary it (and no other page here) currently has.
+  useEffect(() => {
+    const sourceId = new URLSearchParams(window.location.search).get("source");
+    if (!sourceId || sourceImage) return;
+    getImageBlobUrl(sourceId)
+      .then((url) => {
+        setSourceImage({ id: sourceId, content_type: "image/png", size_bytes: 0, created_at: new Date().toISOString() });
+        setSourceBlobUrl(url);
+      })
+      .catch(() => setError("Could not load the source image."));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleUploadSource(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -124,6 +167,28 @@ export default function ImageEditPage() {
     }
   }
 
+  async function handleRetry(job: ImageEditJobItem) {
+    if (!job.source_image_id) return;
+    try {
+      const retried = await createEditJob({
+        operation: job.operation,
+        source_image_id: job.source_image_id,
+        mask_image_id: job.mask_image_id ?? undefined,
+        prompt: job.prompt ?? undefined,
+        negative_prompt: job.negative_prompt ?? undefined,
+        steps: job.steps ?? undefined,
+        outpaint_top: job.params.outpaint_top,
+        outpaint_bottom: job.params.outpaint_bottom,
+        outpaint_left: job.params.outpaint_left,
+        outpaint_right: job.params.outpaint_right,
+      });
+      setJobs((prev) => [retried, ...prev]);
+      watchJob(retried.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start image edit job.");
+    }
+  }
+
   const canSubmit =
     !!sourceImage &&
     !submitting &&
@@ -132,22 +197,37 @@ export default function ImageEditPage() {
       (operation === "OUTPAINT" && prompt.trim().length > 0 && (padTop || padBottom || padLeft || padRight) > 0));
 
   return (
-    <div className="min-h-screen bg-white px-6 py-8 text-gray-900">
+    <div className="relative min-h-screen bg-white px-6 py-8 text-gray-900">
+      <PageBlobBackground />
       <div className="mx-auto max-w-3xl">
-        <div className="mb-2 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">MyBuddy Image Edit</h1>
-          <Link href="/chat" className="text-sm text-indigo-600 hover:underline">
-            &larr; Back to chat
-          </Link>
-        </div>
-        <p className="mb-6 text-sm text-gray-400">
-          Runs as a separate process (see <code>imagegen/README.md</code>). Background removal is fast even on
-          CPU; inpaint/outpaint go through a full diffusion pipeline and are much slower without a GPU.
-        </p>
+        <PageHeader
+          icon={Wand2}
+          title="MyBuddy Image Edit"
+          description="Runs as a separate process (see imagegen/README.md). Background removal is fast even on CPU;
+          inpaint/outpaint go through a full diffusion pipeline and are much slower without a GPU."
+        />
 
-        {error && <p className="mb-4 text-sm text-red-500">{error}</p>}
+        {error && (
+          <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        )}
 
-        <section className="mb-8 rounded-xl border border-gray-200 bg-white p-4">
+        {failedNotice && (
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+            <AlertTriangle className="h-4 w-4 shrink-0" strokeWidth={2} />
+            <span className="flex-1">{failedNotice.message}</span>
+            <button
+              onClick={() => {
+                setFailedNotice(null);
+                handleRetry(failedNotice.job);
+              }}
+              className="shrink-0 rounded-full px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        <section className="mb-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md">
           <h2 className="mb-3 text-sm font-medium text-gray-700">1. Upload a source image</h2>
           <input ref={sourceInputRef} type="file" accept="image/*" onChange={handleUploadSource} className="hidden" />
           <button
@@ -165,7 +245,7 @@ export default function ImageEditPage() {
                     key={op}
                     onClick={() => setOperation(op)}
                     className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
-                      operation === op ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      operation === op ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                     }`}
                   >
                     {op === "INPAINT" ? "Inpaint" : op === "OUTPAINT" ? "Outpaint" : "Remove background"}
@@ -253,7 +333,7 @@ export default function ImageEditPage() {
               <button
                 onClick={handleSubmit}
                 disabled={!canSubmit}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
+                className="rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-medium text-white hover:from-indigo-500 hover:to-violet-500 disabled:opacity-40"
               >
                 {submitting ? "Starting..." : "Run"}
               </button>
@@ -261,38 +341,62 @@ export default function ImageEditPage() {
           )}
         </section>
 
-        <section className="rounded-xl border border-gray-200 bg-white p-4">
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md">
           <h2 className="mb-3 text-sm font-medium text-gray-700">Your edits</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             {jobs.map((job) => (
-              <div key={job.id} className="rounded-lg border border-gray-200 p-2">
+              <div
+                key={job.id}
+                className="group rounded-xl border border-gray-200 p-2 transition hover:border-indigo-300 hover:shadow-sm"
+              >
                 {job.result_image_id ? (
                   <AuthedImage
                     imageId={job.result_image_id}
-                    className="mb-2 h-32 w-full rounded-lg object-cover"
+                    className="mb-2 h-32 w-full rounded-lg object-cover transition-transform duration-200 group-hover:scale-[1.02]"
                     downloadable
                     downloadFilename="mybuddy-edited-image.png"
+                    onOpen={(src) => setLightbox({ src, job })}
                   />
                 ) : (
+                  // FAILED jobs never reach this list — they're auto-removed the moment the
+                  // poll sees them (see reportFailure) — so anything without a result_image_id
+                  // here is still genuinely in flight.
                   <div className="mb-2 flex h-32 w-full items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-400">
-                    {job.status === "FAILED" ? "failed" : <LoadingGrid className="h-10 w-10" />}
+                    <LoadingGrid className="h-10 w-10" />
                   </div>
                 )}
                 <p className="truncate text-xs text-gray-700">{job.operation}</p>
                 <div className="mt-1 flex items-center justify-between">
                   <span className={`text-xs ${STATUS_COLORS[job.status]}`}>{job.status}</span>
                 </div>
-                {job.error_message && (
-                  <p className="mt-1 truncate text-xs text-red-500/80" title={job.error_message}>
-                    {job.error_message}
-                  </p>
-                )}
               </div>
             ))}
             {jobs.length === 0 && <p className="col-span-full py-6 text-center text-sm text-gray-400">No edits yet.</p>}
           </div>
         </section>
       </div>
+
+      {lightbox && (
+        <MediaLightbox
+          open
+          onClose={() => setLightbox(null)}
+          mediaType="image"
+          src={lightbox.src}
+          prompt={lightbox.job.prompt}
+          onDownload={() => {
+            const link = document.createElement("a");
+            link.href = lightbox.src;
+            link.download = "mybuddy-edited-image.png";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }}
+          onRegenerate={() => {
+            setLightbox(null);
+            handleRetry(lightbox.job);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -18,12 +18,22 @@ export function createVideoGenerationJob(params: VideoGenerationParams): Promise
   });
 }
 
+export function listVideoGenerationJobs(): Promise<VideoGenerationJobItem[]> {
+  return apiJson<VideoGenerationJobItem[]>("/api/v1/video-generation");
+}
+
 export function getVideoGenerationJob(id: string): Promise<VideoGenerationJobItem> {
   return apiJson<VideoGenerationJobItem>(`/api/v1/video-generation/${id}`);
 }
 
 export function cancelVideoGenerationJob(id: string): Promise<VideoGenerationJobItem> {
   return apiJson<VideoGenerationJobItem>(`/api/v1/video-generation/${id}/cancel`, { method: "POST" });
+}
+
+/** Removes a finished job's row server-side — used to auto-clean a FAILED job so it doesn't
+ * sit around forever, same pattern as imageGeneration.ts::deleteGenerationJob. */
+export function deleteVideoGenerationJob(id: string): Promise<void> {
+  return apiJson<void>(`/api/v1/video-generation/${id}`, { method: "DELETE" });
 }
 
 const TERMINAL_STATUSES = new Set(["COMPLETED", "FAILED", "CANCELLED"]);

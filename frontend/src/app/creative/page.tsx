@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Target } from "lucide-react";
+import WorkspaceHeader from "@/components/WorkspaceHeader";
 import { listAnimationDocuments } from "@/lib/animation";
 import { apiFetch } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
@@ -196,12 +197,7 @@ export default function CreativePage() {
 
   return (
     <div className="flex h-screen flex-col bg-white text-gray-900">
-      <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
-        <h1 className="text-lg font-semibold">MyBuddy Creative Director</h1>
-        <Link href="/chat" className="text-sm text-indigo-600 hover:underline">
-          &larr; Back to chat
-        </Link>
-      </div>
+      <WorkspaceHeader icon={Target} title="MyBuddy Creative Director" />
 
       {error && <p className="border-b border-gray-200 bg-red-50 px-4 py-2 text-sm text-red-500">{error}</p>}
 
@@ -229,7 +225,7 @@ export default function CreativePage() {
             <button
               onClick={handleCreateBrandKit}
               disabled={!kitName.trim()}
-              className="mb-2 w-full rounded-lg bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
+              className="mb-2 w-full rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-2 py-1 text-xs font-medium text-white hover:from-indigo-500 hover:to-violet-500 disabled:opacity-40"
             >
               + Add brand kit
             </button>
@@ -266,7 +262,7 @@ export default function CreativePage() {
             <button
               onClick={handleCreateProject}
               disabled={!projectTitle.trim()}
-              className="mb-2 w-full rounded-lg bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
+              className="mb-2 w-full rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-2 py-1 text-xs font-medium text-white hover:from-indigo-500 hover:to-violet-500 disabled:opacity-40"
             >
               + New project
             </button>
@@ -322,7 +318,7 @@ export default function CreativePage() {
                 <button
                   onClick={handleGenerateAsset}
                   disabled={!genPrompt.trim() || generating}
-                  className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
+                  className="rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:from-indigo-500 hover:to-violet-500 disabled:opacity-40"
                 >
                   {generating ? "Generating..." : "+ Generate asset"}
                 </button>
@@ -358,7 +354,7 @@ export default function CreativePage() {
                   <button
                     onClick={handleAttach}
                     disabled={!attachId}
-                    className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
+                    className="rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:from-indigo-500 hover:to-violet-500 disabled:opacity-40"
                   >
                     Attach
                   </button>

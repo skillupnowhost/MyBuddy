@@ -137,3 +137,12 @@ def cancel_image_edit_job_endpoint(
     db.commit()
     db.refresh(job)
     return job
+
+
+@router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_image_edit_job(job_id: uuid.UUID, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    job = _get_owned_job(db, job_id, user)
+    if job.status in ("PENDING", "RUNNING"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel the job before deleting it.")
+    db.delete(job)
+    db.commit()

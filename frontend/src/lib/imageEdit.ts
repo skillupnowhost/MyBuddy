@@ -33,6 +33,12 @@ export function cancelEditJob(id: string): Promise<ImageEditJobItem> {
   return apiJson<ImageEditJobItem>(`/api/v1/image-edit/${id}/cancel`, { method: "POST" });
 }
 
+/** Removes a finished job's row server-side — used to auto-clean a FAILED job so it doesn't
+ * sit around forever, same pattern as imageGeneration.ts::deleteGenerationJob. */
+export function deleteEditJob(id: string): Promise<void> {
+  return apiJson<void>(`/api/v1/image-edit/${id}`, { method: "DELETE" });
+}
+
 const TERMINAL_STATUSES = new Set(["COMPLETED", "FAILED", "CANCELLED"]);
 
 /** Same self-scheduling poll-until-terminal-status shape as imageGeneration.ts::pollGenerationJob. */

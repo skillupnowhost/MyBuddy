@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { SlidersHorizontal } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
+import PageBlobBackground from "@/components/PageBlobBackground";
 import { getCurrentUser } from "@/lib/admin";
 import { isLoggedIn } from "@/lib/auth";
 import {
@@ -131,23 +133,21 @@ export default function FinetunePage() {
   const validatedDatasets = datasets.filter((d) => d.status === "VALIDATED");
 
   return (
-    <div className="min-h-screen bg-white px-6 py-8 text-gray-900">
+    <div className="relative min-h-screen bg-white px-6 py-8 text-gray-900">
+      <PageBlobBackground />
       <div className="mx-auto max-w-4xl">
-        <div className="mb-2 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Fine-tuning</h1>
-          <Link href="/chat" className="text-sm text-indigo-600 hover:underline">
-            &larr; Back to chat
-          </Link>
-        </div>
-        <p className="mb-6 text-sm text-gray-400">
-          Training runs as a separate process (see <code>training/README.md</code>). On a machine without a GPU and
-          the training environment installed, jobs will correctly fail fast with a clear message rather than
-          pretending to train — that's expected here.
-        </p>
+        <PageHeader
+          icon={SlidersHorizontal}
+          title="Fine-tuning"
+          description="Training runs as a separate process (see training/README.md). Without a GPU and the training
+          environment installed, jobs correctly fail fast rather than pretending to train."
+        />
 
-        {error && <p className="mb-4 text-sm text-red-500">{error}</p>}
+        {error && (
+          <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        )}
 
-        <section className="mb-8 rounded-xl border border-gray-200 bg-white p-4">
+        <section className="mb-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md">
           <h2 className="mb-3 text-sm font-medium text-gray-700">Datasets</h2>
           <input ref={fileInputRef} type="file" accept=".jsonl,.json" onChange={handleUpload} className="hidden" />
           <button
@@ -179,7 +179,7 @@ export default function FinetunePage() {
           </div>
         </section>
 
-        <section className="mb-8 rounded-xl border border-gray-200 bg-white p-4">
+        <section className="mb-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md">
           <h2 className="mb-3 text-sm font-medium text-gray-700">Start a training job</h2>
           <div className="flex flex-wrap gap-2">
             <select
@@ -203,7 +203,7 @@ export default function FinetunePage() {
             <button
               onClick={handleStartTraining}
               disabled={!selectedDataset || !baseModel.trim()}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-40"
+              className="rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-medium text-white hover:from-indigo-500 hover:to-violet-500 disabled:opacity-40"
             >
               Start
             </button>
@@ -237,7 +237,7 @@ export default function FinetunePage() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-gray-200 bg-white p-4">
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-medium text-gray-700">Model registry</h2>
             {isAdmin && (

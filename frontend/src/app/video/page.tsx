@@ -2,22 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ImageIcon, Sparkles } from "lucide-react";
-import AuthedImage from "@/components/AuthedImage";
+import { AlertTriangle, Sparkles, Video as VideoIcon } from "lucide-react";
+import AuthedVideo from "@/components/AuthedVideo";
 import { LoadingGrid } from "@/components/LoadingIcons";
 import MediaLightbox from "@/components/MediaLightbox";
 import PageHeader from "@/components/PageHeader";
 import PageBlobBackground from "@/components/PageBlobBackground";
 import { isLoggedIn } from "@/lib/auth";
 import {
-  cancelGenerationJob,
-  createGenerationJob,
-  deleteGenerationJob,
-  listGenerationJobs,
-  pollGenerationJob,
-  type GenerationParams,
-} from "@/lib/imageGeneration";
-import type { ImageGenerationJobItem } from "@/lib/types";
+  cancelVideoGenerationJob,
+  createVideoGenerationJob,
+  deleteVideoGenerationJob,
+  listVideoGenerationJobs,
+  pollVideoGenerationJob,
+  type VideoGenerationParams,
+} from "@/lib/videoGeneration";
+import type { VideoGenerationJobItem } from "@/lib/types";
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "text-gray-500",
@@ -29,35 +29,36 @@ const STATUS_COLORS: Record<string, string> = {
 
 const TERMINAL_STATUSES = new Set(["COMPLETED", "FAILED", "CANCELLED"]);
 
-export default function ImagePage() {
+export default function VideoPage() {
   const router = useRouter();
-  const [jobs, setJobs] = useState<ImageGenerationJobItem[]>([]);
+  const [jobs, setJobs] = useState<VideoGenerationJobItem[]>([]);
   const [prompt, setPrompt] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
   const [width, setWidth] = useState(512);
   const [height, setHeight] = useState(512);
+  const [numFrames, setNumFrames] = useState(16);
   const [steps, setSteps] = useState(4);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // A failed generation shows here briefly (with the error and a one-click retry) instead of
   // sitting in the gallery forever — the job row itself is deleted server-side the moment it's
-  // known to have failed, see watchJob below.
-  const [failedNotice, setFailedNotice] = useState<{ message: string; job: ImageGenerationJobItem } | null>(null);
-  const [lightbox, setLightbox] = useState<{ src: string; job: ImageGenerationJobItem } | null>(null);
+  // known to have failed, see watchJob below. Same pattern as /image/page.tsx.
+  const [failedNotice, setFailedNotice] = useState<{ message: string; job: VideoGenerationJobItem } | null>(null);
+  const [lightbox, setLightbox] = useState<{ src: string; job: VideoGenerationJobItem } | null>(null);
   const unsubscribersRef = useRef<Map<string, () => void>>(new Map());
   const failedNoticeTimeoutRef = useRef<number | undefined>(undefined);
 
-  function reportFailure(job: ImageGenerationJobItem) {
-    deleteGenerationJob(job.id).catch(() => {});
+  function reportFailure(job: VideoGenerationJobItem) {
+    deleteVideoGenerationJob(job.id).catch(() => {});
     setJobs((prev) => prev.filter((j) => j.id !== job.id));
     window.clearTimeout(failedNoticeTimeoutRef.current);
-    setFailedNotice({ message: job.error_message || "Image generation failed.", job });
+    setFailedNotice({ message: job.error_message || "Video generation failed.", job });
     failedNoticeTimeoutRef.current = window.setTimeout(() => setFailedNotice(null), 8000);
   }
 
   function watchJob(id: string) {
     if (unsubscribersRef.current.has(id)) return;
-    const stop = pollGenerationJob(id, (updated) => {
+    const stop = pollVideoGenerationJob(id, (updated) => {
       if (updated.status === "FAILED") {
         unsubscribersRef.current.get(id)?.();
         unsubscribersRef.current.delete(id);
@@ -78,17 +79,17 @@ export default function ImagePage() {
       router.replace("/login");
       return;
     }
-    listGenerationJobs()
+    listVideoGenerationJobs()
       .then((loaded) => {
         // Sweep any FAILED rows left over from before auto-cleanup existed, or from a session
         // that ended mid-generation, rather than showing them in the gallery.
         const stale = loaded.filter((j) => j.status === "FAILED");
-        stale.forEach((j) => deleteGenerationJob(j.id).catch(() => {}));
+        stale.forEach((j) => deleteVideoGenerationJob(j.id).catch(() => {}));
         const usable = loaded.filter((j) => j.status !== "FAILED");
         setJobs(usable);
         usable.filter((j) => !TERMINAL_STATUSES.has(j.status)).forEach((j) => watchJob(j.id));
       })
-      .catch(() => setError("Could not load image generation jobs."));
+      .catch(() => setError("Could not load video generation jobs."));
 
     const unsubscribers = unsubscribersRef.current;
     return () => {
@@ -99,8 +100,8 @@ export default function ImagePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
-  async function submitJob(params: GenerationParams) {
-    const job = await createGenerationJob(params);
+  async function submitJob(params: VideoGenerationParams) {
+    const job = await createVideoGenerationJob(params);
     setJobs((prev) => [job, ...prev]);
     watchJob(job.id);
     return job;
@@ -117,31 +118,33 @@ export default function ImagePage() {
         negative_prompt: negativePrompt.trim() || undefined,
         width,
         height,
+        num_frames: numFrames,
         steps,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start image generation.");
+      setError(err instanceof Error ? err.message : "Could not start video generation.");
     } finally {
       setSubmitting(false);
     }
   }
 
-  async function handleRetry(job: ImageGenerationJobItem) {
+  async function handleRetry(job: VideoGenerationJobItem) {
     try {
       await submitJob({
         prompt: job.prompt,
         negative_prompt: job.negative_prompt ?? undefined,
         width: job.width,
         height: job.height,
+        num_frames: job.num_frames,
         steps: job.steps,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start image generation.");
+      setError(err instanceof Error ? err.message : "Could not start video generation.");
     }
   }
 
   async function handleCancel(id: string) {
-    const updated = await cancelGenerationJob(id);
+    const updated = await cancelVideoGenerationJob(id);
     setJobs((prev) => prev.map((j) => (j.id === updated.id ? updated : j)));
     unsubscribersRef.current.get(id)?.();
     unsubscribersRef.current.delete(id);
@@ -152,9 +155,9 @@ export default function ImagePage() {
       <PageBlobBackground />
       <div className="mx-auto max-w-3xl">
         <PageHeader
-          icon={ImageIcon}
-          title="MyBuddy Image"
-          description="Generation runs as a separate process (see imagegen/README.md). Without a GPU and the image
+          icon={VideoIcon}
+          title="MyBuddy Video"
+          description="Generation runs as a separate process (see video/README.md). Without a GPU and the video
           generation environment installed, jobs correctly fail fast rather than pretending to generate anything."
         />
 
@@ -181,12 +184,12 @@ export default function ImagePage() {
         <section className="mb-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md">
           <h2 className="mb-3 flex items-center gap-1.5 text-sm font-medium text-gray-700">
             <Sparkles className="h-4 w-4 text-indigo-500" strokeWidth={2} />
-            Generate an image
+            Generate a video
           </h2>
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="A small red robot reading a book, watercolor style"
+            placeholder="A small red robot waving hello, watercolor style"
             rows={3}
             className="mb-2 w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-indigo-400 focus:bg-white"
           />
@@ -216,6 +219,15 @@ export default function ImagePage() {
               />
             </label>
             <label className="flex items-center gap-2 text-xs text-gray-500">
+              Frames
+              <input
+                type="number"
+                value={numFrames}
+                onChange={(e) => setNumFrames(Number(e.target.value))}
+                className="w-16 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-900"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-xs text-gray-500">
               Steps
               <input
                 type="number"
@@ -228,7 +240,7 @@ export default function ImagePage() {
           <button
             onClick={handleGenerate}
             disabled={!prompt.trim() || submitting}
-            className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-500 hover:shadow-md disabled:opacity-40 disabled:shadow-none"
+            className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:from-indigo-500 hover:to-violet-500 hover:shadow-md disabled:opacity-40 disabled:shadow-none"
           >
             {submitting ? "Starting..." : "Generate"}
           </button>
@@ -242,17 +254,16 @@ export default function ImagePage() {
                 key={job.id}
                 className="group rounded-xl border border-gray-200 p-2 transition hover:border-indigo-300 hover:shadow-sm"
               >
-                {job.image_id ? (
-                  <AuthedImage
-                    imageId={job.image_id}
+                {job.video_id ? (
+                  <AuthedVideo
+                    videoId={job.video_id}
                     className="mb-2 h-32 w-full rounded-lg object-cover transition-transform duration-200 group-hover:scale-[1.02]"
-                    downloadable
-                    downloadFilename={`${job.prompt.slice(0, 40).replace(/[^a-z0-9]+/gi, "-") || "mybuddy-image"}.png`}
+                    downloadFilename={`${job.prompt.slice(0, 40).replace(/[^a-z0-9]+/gi, "-") || "mybuddy-video"}.mp4`}
                     onOpen={(src) => setLightbox({ src, job })}
                   />
                 ) : (
                   // FAILED jobs never reach this list — they're auto-removed the moment the
-                  // poll sees them (see reportFailure) — so anything without an image_id here
+                  // poll sees them (see reportFailure) — so anything without a video_id here
                   // is still genuinely in flight.
                   <div className="mb-2 flex h-32 w-full items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-400">
                     <LoadingGrid className="h-10 w-10" />
@@ -282,13 +293,13 @@ export default function ImagePage() {
         <MediaLightbox
           open
           onClose={() => setLightbox(null)}
-          mediaType="image"
+          mediaType="video"
           src={lightbox.src}
           prompt={lightbox.job.prompt}
           onDownload={() => {
             const link = document.createElement("a");
             link.href = lightbox.src;
-            link.download = `${lightbox.job.prompt.slice(0, 40).replace(/[^a-z0-9]+/gi, "-") || "mybuddy-image"}.png`;
+            link.download = `${lightbox.job.prompt.slice(0, 40).replace(/[^a-z0-9]+/gi, "-") || "mybuddy-video"}.mp4`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -297,7 +308,6 @@ export default function ImagePage() {
             setLightbox(null);
             handleRetry(lightbox.job);
           }}
-          onEditImage={() => router.push(`/image-edit?source=${lightbox.job.image_id}`)}
         />
       )}
     </div>

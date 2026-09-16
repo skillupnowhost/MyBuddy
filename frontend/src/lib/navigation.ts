@@ -1,6 +1,7 @@
 import {
   Code2,
   Image as ImageIcon,
+  Video,
   PenTool,
   Film,
   Clapperboard,
@@ -21,6 +22,7 @@ export interface ToolLink {
 export const TOOL_LINKS: ToolLink[] = [
   { href: "/code", label: "Code", icon: Code2 },
   { href: "/image", label: "Image", icon: ImageIcon },
+  { href: "/video", label: "Video", icon: Video },
   { href: "/vector", label: "Vector", icon: PenTool },
   { href: "/animation", label: "Animator", icon: Film },
   { href: "/motion", label: "Motion", icon: Clapperboard },

@@ -16,10 +16,11 @@ import {
 } from "lucide-react";
 import AnimatedIcon from "@/components/AnimatedIcon";
 import { LoadingDots, LoadingGrid, LoadingRings } from "@/components/LoadingIcons";
+import MediaLightbox from "@/components/MediaLightbox";
 import { apiFetch, apiJson } from "@/lib/api";
 import { createAnimationDocument, getAnimationBlobUrl, downloadAnimationDocument } from "@/lib/animation";
 import { getImageBlobUrl } from "@/lib/images";
-import { cancelGenerationJob, createGenerationJob, pollGenerationJob } from "@/lib/imageGeneration";
+import { cancelGenerationJob, createGenerationJob, deleteGenerationJob, pollGenerationJob } from "@/lib/imageGeneration";
 import { createVectorDocument, downloadVectorDocument } from "@/lib/vector";
 import {
   cancelVideoGenerationJob,
@@ -140,7 +141,15 @@ async function withOneRetry<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-export default function QuickCreatePanel({ onActivityChange }: { onActivityChange?: (active: boolean) => void }) {
+export default function QuickCreatePanel({
+  onActivityChange,
+  chromeless = false,
+}: {
+  onActivityChange?: (active: boolean) => void;
+  /** Drops the outer card + title/subtitle — for embedding inside a modal that already
+   * supplies its own chrome (see GlobalQuickCreate), instead of the homepage's bare section. */
+  chromeless?: boolean;
+}) {
   const [activeTab, setActiveTab] = useState<TabId>("image");
   const [prompts, setPrompts] = useState<Record<TabId, string>>({
     image: "",
@@ -159,6 +168,7 @@ export default function QuickCreatePanel({ onActivityChange }: { onActivityChang
   });
   const stopPollRef = useRef<Partial<Record<TabId, () => void>>>({});
   const timeoutRef = useRef<Partial<Record<TabId, number>>>({});
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -210,6 +220,7 @@ export default function QuickCreatePanel({ onActivityChange }: { onActivityChang
           }
         } else if (updated.status === "FAILED" || updated.status === "CANCELLED") {
           clearTabTimers("image");
+          if (updated.status === "FAILED") deleteGenerationJob(updated.id).catch(() => {});
           setResult("image", {
             status: "error",
             error: updated.status === "CANCELLED" ? "Generation cancelled." : updated.error_message || "Image generation failed.",
@@ -369,16 +380,18 @@ export default function QuickCreatePanel({ onActivityChange }: { onActivityChang
   const isGenerating = result.status === "generating";
 
   return (
-    <section className="rounded-3xl border border-gray-200 bg-white p-4 sm:p-6">
-      <div className="mb-4 flex items-center gap-2">
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500">
-          <AnimatedIcon icon={Sparkles} className="h-4 w-4 text-white" strokeWidth={2.5} />
-        </span>
-        <div>
-          <h2 className="text-sm font-semibold text-gray-900">Quick Create Studio</h2>
-          <p className="text-xs text-gray-500">Generate & download images, video, motion graphics, SVGs and documents — right here.</p>
+    <section className={chromeless ? "" : "rounded-3xl border border-gray-200 bg-white p-4 sm:p-6"}>
+      {!chromeless && (
+        <div className="mb-4 flex items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500">
+            <AnimatedIcon icon={Sparkles} className="h-4 w-4 text-white" strokeWidth={2.5} />
+          </span>
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900">Quick Create Studio</h2>
+            <p className="text-xs text-gray-500">Generate & download images, video, motion graphics, SVGs and documents — right here.</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mb-4 flex flex-wrap gap-2">
         {TABS.map((t) => (
@@ -478,15 +491,33 @@ export default function QuickCreatePanel({ onActivityChange }: { onActivityChang
         <div className="mt-4 rounded-2xl border border-gray-100 bg-gray-50 p-3">
           {result.previewType === "video" && result.previewUrl && (
             // eslint-disable-next-line jsx-a11y/media-has-caption -- generated preview, no captions available
-            <video src={result.previewUrl} controls autoPlay loop muted className="mx-auto max-h-72 w-auto rounded-xl" />
+            <video
+              src={result.previewUrl}
+              controls
+              autoPlay
+              loop
+              muted
+              className="mx-auto max-h-72 w-auto cursor-zoom-in rounded-xl"
+              onClick={() => setLightboxOpen(true)}
+            />
           )}
           {result.previewType === "image" && result.previewUrl && (
             // eslint-disable-next-line @next/next/no-img-element -- a blob: URL can't go through next/image's loader
-            <img src={result.previewUrl} alt="Generated image" className="mx-auto max-h-72 w-auto rounded-xl" />
+            <img
+              src={result.previewUrl}
+              alt="Generated image"
+              className="mx-auto max-h-72 w-auto cursor-zoom-in rounded-xl"
+              onClick={() => setLightboxOpen(true)}
+            />
           )}
           {result.previewType === "svg" && result.previewUrl && (
             // eslint-disable-next-line @next/next/no-img-element -- a blob: URL can't go through next/image's loader
-            <img src={result.previewUrl} alt="Generated artwork" className="mx-auto max-h-72 w-auto rounded-xl bg-white" />
+            <img
+              src={result.previewUrl}
+              alt="Generated artwork"
+              className="mx-auto max-h-72 w-auto cursor-zoom-in rounded-xl bg-white"
+              onClick={() => setLightboxOpen(true)}
+            />
           )}
           {result.previewType === "text" && result.textContent && (
             <div className="thin-scroll max-h-64 overflow-y-auto rounded-xl bg-white p-4 text-sm text-gray-700">
@@ -503,6 +534,21 @@ export default function QuickCreatePanel({ onActivityChange }: { onActivityChang
             </button>
           </div>
         </div>
+      )}
+
+      {lightboxOpen && result.status === "done" && result.previewUrl && result.previewType !== "text" && (
+        <MediaLightbox
+          open
+          onClose={() => setLightboxOpen(false)}
+          mediaType={result.previewType as "image" | "video" | "svg"}
+          src={result.previewUrl}
+          prompt={prompt}
+          onDownload={handleDownload}
+          onRegenerate={() => {
+            setLightboxOpen(false);
+            handleGenerate();
+          }}
+        />
       )}
     </section>
   );

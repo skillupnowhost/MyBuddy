@@ -21,6 +21,7 @@ export interface ImageItem {
   content_type: string;
   size_bytes: number;
   created_at: string;
+  prompt?: string | null;
 }
 
 export interface Message {

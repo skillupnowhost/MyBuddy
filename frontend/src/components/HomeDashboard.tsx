@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { ImageIcon, PenLine, Code2, Search, Sparkles, type LucideIcon } from "lucide-react";
+import { ImageIcon, Video, PenLine, Code2, Search, Sparkles, type LucideIcon } from "lucide-react";
 import robotImg from "@/images/AI Agent.png";
 import AnimatedIcon from "@/components/AnimatedIcon";
 import QuickCreatePanel from "@/components/QuickCreatePanel";
@@ -28,6 +28,7 @@ export default function HomeDashboard({ displayName, onPromptSelect, onOpenDocum
 
   const quickActions: QuickAction[] = [
     { title: "Create Image", description: "Generate stunning images from your ideas", icon: ImageIcon, href: "/image" },
+    { title: "Create Video", description: "Turn a prompt into short generated clips", icon: Video, href: "/video" },
     {
       title: "Write & Edit",
       description: "Draft, improve, or rewrite anything",

@@ -19,7 +19,8 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import AuthedImage from "@/components/AuthedImage";
 import CopyButton from "@/components/CopyButton";
-import type { Message } from "@/lib/types";
+import MediaLightbox from "@/components/MediaLightbox";
+import type { ImageItem, Message } from "@/lib/types";
 
 const ICON_BTN = "flex h-7 w-7 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700";
 
@@ -130,6 +131,7 @@ export default function MessageBubble({
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(message.content);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [lightboxImage, setLightboxImage] = useState<{ src: string; image: ImageItem } | null>(null);
 
   // Grows the edit box to fit the whole message (no internal scrollbar, ever) — the message
   // list itself already scrolls, so there's no fixed-height constraint to cap this against
@@ -284,6 +286,19 @@ export default function MessageBubble({
       <div className="max-w-[80%] text-sm leading-relaxed text-gray-800">
         {markdown}
 
+        {message.images && message.images.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {message.images.map((img) => (
+              <AuthedImage
+                key={img.id}
+                imageId={img.id}
+                className="h-40 w-40 rounded-xl object-cover"
+                onOpen={(src) => setLightboxImage({ src, image: img })}
+              />
+            ))}
+          </div>
+        )}
+
         {message.toolCall && (
           <div className="mt-2 border-t border-gray-200 pt-2">
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
@@ -337,6 +352,24 @@ export default function MessageBubble({
         )}
         <CopyButton text={message.content} className={ICON_BTN} />
       </div>
+
+      {lightboxImage && (
+        <MediaLightbox
+          open
+          onClose={() => setLightboxImage(null)}
+          mediaType="image"
+          src={lightboxImage.src}
+          prompt={lightboxImage.image.prompt}
+          onDownload={() => {
+            const link = document.createElement("a");
+            link.href = lightboxImage.src;
+            link.download = `${lightboxImage.image.id}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }}
+        />
+      )}
     </div>
   );
 }
