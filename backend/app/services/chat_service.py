@@ -32,6 +32,7 @@ from app.services.model_router import get_model_router
 from app.services.rag_service import build_rag_prompt, retrieve_context
 from app.services.tools import (
     ToolContext,
+    extract_explicit_image_request,
     get_current_datetime_context,
     get_tools_system_prompt,
     looks_like_tool_call_start,
@@ -287,38 +288,55 @@ async def stream_assistant_reply(
                 # fenced-block output, not a judge's prose synthesis — so MAX-mode
                 # conversations skip the tools_enabled branch entirely.
             elif conversation.tools_enabled:
-                # A tool call is only ever valid as the model's ENTIRE first-pass reply (per
-                # the system prompt), so its opening characters give it away early. Hold back
-                # exactly that much before showing anything, so raw tool-call syntax — fenced,
-                # or on a small model that drops the fence, completely bare JSON — never
-                # flashes into the chat as if it were the answer (see looks_like_tool_call_start).
-                lookahead = ""
-                decided = False
-                showing = False
-                looks_like_tool_call = False
-                async for delta in llm_client.chat_stream(model, history, usage_sink=usage_sink):
-                    full_reply += delta
-                    if showing:
-                        yield f"data: {json.dumps({'delta': delta})}\n\n"
-                        continue
-                    if decided:
-                        # Decided, but not showing: this IS a tool-call attempt — keep
-                        # silently buffering into full_reply (above) for the rest of this pass.
-                        continue
-                    lookahead += delta
-                    if len(lookahead) < _TOOL_CALL_LOOKAHEAD_CHARS:
-                        continue
-                    decided = True
-                    looks_like_tool_call = looks_like_tool_call_start(lookahead)
-                    showing = not looks_like_tool_call
-                    if showing:
-                        yield f"data: {json.dumps({'delta': lookahead})}\n\n"
-                if not decided:
-                    # Stream ended before the lookahead filled — too short to matter either
-                    # way, so just show what came in.
-                    looks_like_tool_call = looks_like_tool_call_start(lookahead)
-                    if not looks_like_tool_call:
-                        yield f"data: {json.dumps({'delta': lookahead})}\n\n"
+                explicit_image_prompt = extract_explicit_image_request(user_content)
+                if explicit_image_prompt is not None:
+                    # An unmistakably-phrased image request — route straight to the tool
+                    # rather than trust a (possibly small, local) model to notice and emit
+                    # the fenced tool-call format on its own; see
+                    # extract_explicit_image_request. Synthesizes exactly the reply a model
+                    # that DID call the tool correctly would have produced, so everything
+                    # below (tool_result handling, follow-up streaming, persistence) runs
+                    # identically either way — this call is never itself shown to the user.
+                    full_reply = (
+                        "```tool\n"
+                        + json.dumps({"tool": "generate_image", "args": {"prompt": explicit_image_prompt}})
+                        + "\n```"
+                    )
+                    looks_like_tool_call = True
+                else:
+                    # A tool call is only ever valid as the model's ENTIRE first-pass reply
+                    # (per the system prompt), so its opening characters give it away early.
+                    # Hold back exactly that much before showing anything, so raw tool-call
+                    # syntax — fenced, or on a small model that drops the fence, completely
+                    # bare JSON — never flashes into the chat as if it were the answer (see
+                    # looks_like_tool_call_start).
+                    lookahead = ""
+                    decided = False
+                    showing = False
+                    looks_like_tool_call = False
+                    async for delta in llm_client.chat_stream(model, history, usage_sink=usage_sink):
+                        full_reply += delta
+                        if showing:
+                            yield f"data: {json.dumps({'delta': delta})}\n\n"
+                            continue
+                        if decided:
+                            # Decided, but not showing: this IS a tool-call attempt — keep
+                            # silently buffering into full_reply (above) for the rest of this pass.
+                            continue
+                        lookahead += delta
+                        if len(lookahead) < _TOOL_CALL_LOOKAHEAD_CHARS:
+                            continue
+                        decided = True
+                        looks_like_tool_call = looks_like_tool_call_start(lookahead)
+                        showing = not looks_like_tool_call
+                        if showing:
+                            yield f"data: {json.dumps({'delta': lookahead})}\n\n"
+                    if not decided:
+                        # Stream ended before the lookahead filled — too short to matter either
+                        # way, so just show what came in.
+                        looks_like_tool_call = looks_like_tool_call_start(lookahead)
+                        if not looks_like_tool_call:
+                            yield f"data: {json.dumps({'delta': lookahead})}\n\n"
 
                 tool_result = await maybe_run_tool_call(full_reply, ToolContext(db=db, user_id=conversation.user_id))
                 if tool_result is not None:

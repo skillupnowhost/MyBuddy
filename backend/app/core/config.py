@@ -140,21 +140,26 @@ class Settings(BaseSettings):
     # object prompts), not a real scene-placement engine — see
     # scene_decomposition_service.py's docstring for why.
     cg3d_scene_max_objects: int = 12
-    cg3d_scene_max_retries: int = 1
+    # 3 corrective retries (4 attempts total), not 1 — a small local model (e.g. llama3.2:1b)
+    # frequently gets the JSON schema wrong on its first try or two even with the error fed
+    # back to it; observed failing reliably at 2 attempts total in practice, succeeding within
+    # 3-4 given another corrective round. Same reasoning applies to storyboard/vector below,
+    # which share this exact fenced-block + Pydantic-validation + repair-retry convention.
+    cg3d_scene_max_retries: int = 3
 
     # --- StoryboardGenerator (video/CG/VFX spec §7) ---
     # Pure LLM structured output, same fenced-block + Pydantic-validation + repair-retry
     # convention as Vector's generate_scene — no image/video model involved, so this reuses
     # settings.ollama_model directly rather than a dedicated capability.
     storyboard_max_shots: int = 30
-    storyboard_max_retries: int = 1
+    storyboard_max_retries: int = 3
 
     # --- Vector graphics ---
     # No dedicated model setting: generation is plain JSON-producing text generation, not a
     # specialized capability like vision/code, so it reuses settings.ollama_model directly
     # rather than pulling a third model at startup.
     vector_max_objects_per_document: int = 100  # hard ceiling; must stay >= every purpose's max_objects below
-    vector_max_retries: int = 1  # JSON-repair retry count on invalid scene/operation output
+    vector_max_retries: int = 3  # JSON-repair retry count on invalid scene/operation output
     vector_canvas_max_width: int = 2000
     vector_canvas_max_height: int = 2000
     # Per-purpose defaults for MyBuddy Illustrator presets (General/Illustration/Logo/Icon) —

@@ -10,8 +10,12 @@ settings = get_settings()
 
 _POLL_INTERVAL_SECONDS = 2
 # Local diffusion on CPU-only hardware (no GPU) is slow but does complete, unlike video —
-# generous enough to cover that case without leaving a chat turn hanging indefinitely.
-_MAX_WAIT_SECONDS = 240
+# generous enough to cover that case without leaving a chat turn hanging indefinitely. Matches
+# QuickCreatePanel's own 5-minute image timeout (frontend/src/components/QuickCreatePanel.tsx)
+# — measured at ~270s for a 512x512/20-step image on a 7GB-RAM CPU-only dev machine, so 240s
+# was cutting it close enough to report a false "timed out" moments before the job actually
+# completed.
+_MAX_WAIT_SECONDS = 300
 
 
 class GenerateImageTool(Tool):

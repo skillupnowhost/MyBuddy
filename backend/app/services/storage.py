@@ -26,7 +26,12 @@ _SAFE_VIDEO_EXTENSIONS = {
 
 
 def _save(user_id: str, subdir: str, extension: str, content: bytes) -> str:
-    user_dir = os.path.join(settings.storage_dir, subdir, user_id)
+    # storage_dir defaults to a relative "./data" — must be made absolute here, since the
+    # resulting storage_path is persisted to the DB and later read back by other, independent
+    # processes (imagegen/video/training subprocesses) with their own working directory. A
+    # relative path stored by this process would silently resolve to the wrong file under
+    # theirs (see edit_image.py's fetch_image, which reads this column verbatim).
+    user_dir = os.path.join(os.path.abspath(settings.storage_dir), subdir, user_id)
     os.makedirs(user_dir, exist_ok=True)
     storage_path = os.path.join(user_dir, f"{uuid.uuid4().hex}{extension}")
     with open(storage_path, "wb") as f:

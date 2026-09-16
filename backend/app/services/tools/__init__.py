@@ -28,6 +28,18 @@ _TOOL_CALL_PATTERN = re.compile(r"```tool\s*\n(.*?)\n```", re.DOTALL)
 # normal answer that happens to mention or contain JSON is never misread as a tool call.
 _BARE_TOOL_CALL_PATTERN = re.compile(r'^\{\s*"tool"\s*:.*\}$', re.DOTALL)
 
+# Requires a creation verb AND a visual-media noun AND an explicit connector before the
+# description — e.g. "create an image of X", "generate a picture showing X", "make a logo
+# for X", "create image: X" — deliberately narrow so it can't misfire on something like
+# "create an image processing script" (no connector after the noun) or "make a plan for the
+# launch" (no media noun). See extract_explicit_image_request.
+_IMAGE_REQUEST_PATTERN = re.compile(
+    r"^(?:please\s+)?(?:create|generate|draw|make|paint)\s+(?:an?\s+)?"
+    r"(?:image|picture|photo|illustration|logo|drawing|artwork)\s*"
+    r"(?:of|showing|depicting|featuring|for|:|-|,)\s*(.+)$",
+    re.IGNORECASE,
+)
+
 
 def get_current_datetime_context() -> str:
     """A one-line grounding fact injected directly into the system prompt on every turn,
@@ -62,6 +74,21 @@ def get_tools_system_prompt(code_project_active: bool = False) -> str:
         "doesn't use the generate_image tool'); it exists for you to call, not to discuss. If a "
         "tool isn't relevant, just answer the question directly as if this note weren't here."
     )
+
+
+def extract_explicit_image_request(text: str) -> str | None:
+    """An unmistakably-phrased image request ('create an image of X', 'generate a picture
+    showing X', 'draw a logo for X', 'create image: X'...) is routed straight to the
+    generate_image tool instead of relying on the model to notice and emit a correctly
+    formatted tool call itself — a small local model will often just answer in plain text, or
+    invent unrelated code, rather than follow the fenced-block instruction in
+    get_tools_system_prompt. Returns the extracted description, or None if `text` doesn't
+    match (see _IMAGE_REQUEST_PATTERN for exactly how narrow that match is)."""
+    match = _IMAGE_REQUEST_PATTERN.match(text.strip())
+    if not match:
+        return None
+    prompt = match.group(1).strip().rstrip(".!")
+    return prompt or None
 
 
 def looks_like_tool_call_start(text: str) -> bool:

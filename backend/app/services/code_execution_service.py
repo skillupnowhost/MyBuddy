@@ -47,7 +47,12 @@ async def run_python_snippet(code: str, timeout: float = EXECUTION_TIMEOUT_SECON
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-    except OSError:
+    except (OSError, NotImplementedError):
+        # NotImplementedError: Windows' default SelectorEventLoop can't spawn subprocesses
+        # (only ProactorEventLoop can) — whichever loop this process ends up running under is
+        # an environment detail, not something a generated code block should ever be able to
+        # turn into a dead chat stream. Degrade the same way a real OSError does: no output
+        # section, reply still completes normally.
         return ExecutionResult(stdout="", stderr="", timed_out=False)
 
     try:
