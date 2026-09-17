@@ -120,6 +120,18 @@ export interface BenchmarkRunResultItem {
   eval_score: number | null;
 }
 
+export interface ArenaComparisonResultItem {
+  id: string;
+  comparison_id: string;
+  model_id: string;
+  capability: string;
+  prompt: string;
+  response: string;
+  score: number | null;
+  latency_ms: number;
+  created_at: string;
+}
+
 export interface AdminUserItem {
   id: string;
   email: string;

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, Upload } from "lucide-react";
-import { deleteDocument, listDocuments, uploadDocument } from "@/lib/documents";
+import { LoaderCircle, RotateCcw, X, Upload } from "lucide-react";
+import { deleteDocument, listDocuments, retryDocument, uploadDocument } from "@/lib/documents";
 import type { DocumentItem, DocumentStatus } from "@/lib/types";
 
 const STATUS_STYLES: Record<DocumentStatus, string> = {
@@ -22,6 +22,7 @@ function formatSize(bytes: number): string {
 export default function DocumentsPanel({ onClose }: { onClose: () => void }) {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -67,6 +68,20 @@ export default function DocumentsPanel({ onClose }: { onClose: () => void }) {
     setDocuments((prev) => prev.filter((d) => d.id !== id));
   }
 
+  async function handleRetry(id: string) {
+    setRetryingId(id);
+    setError(null);
+    try {
+      const retried = await retryDocument(id);
+      setDocuments((prev) => prev.map((doc) => (doc.id === id ? retried : doc)));
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not retry document.");
+    } finally {
+      setRetryingId(null);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
       <div className="w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-6 shadow-xl">
@@ -106,12 +121,27 @@ export default function DocumentsPanel({ onClose }: { onClose: () => void }) {
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-gray-800">{doc.filename}</p>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-gray-400" title={doc.error_message || undefined}>
                     {formatSize(doc.size_bytes)} ·{" "}
                     <span className={STATUS_STYLES[doc.status]}>{doc.status.toLowerCase()}</span>
                     {doc.error_message ? `: ${doc.error_message}` : ""}
                   </p>
                 </div>
+                {doc.status === "FAILED" && (
+                  <button
+                    onClick={() => handleRetry(doc.id)}
+                    disabled={retryingId === doc.id}
+                    className="ml-2 shrink-0 text-gray-400 hover:text-indigo-600 disabled:opacity-50"
+                    aria-label="Retry document processing"
+                    title="Retry document processing"
+                  >
+                    {retryingId === doc.id ? (
+                      <LoaderCircle className="h-4 w-4 animate-spin" strokeWidth={2} />
+                    ) : (
+                      <RotateCcw className="h-4 w-4" strokeWidth={2} />
+                    )}
+                  </button>
+                )}
                 <button
                   onClick={() => handleDelete(doc.id)}
                   className="ml-2 shrink-0 text-gray-400 hover:text-red-500"

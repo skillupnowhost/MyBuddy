@@ -1,4 +1,5 @@
 from app.core.config import get_settings
+from app.db.models.arena_comparison_result import ArenaComparisonResult
 from app.db.models.model_benchmark_result import ModelBenchmarkResult
 from app.db.models.model_registry import RegisteredModel
 from app.services.benchmark_service import BenchmarkPrompt, run_benchmark, score_response
@@ -104,6 +105,81 @@ def test_benchmark_endpoint_runs_and_updates_score(client, monkeypatch, db_sessi
         listed = client.get(f"/api/v1/admin/models/{model.id}/benchmark", headers=headers)
         assert listed.status_code == 200
         assert len(listed.json()) == 4
+    finally:
+        monkeypatch.delenv("ADMIN_EMAILS", raising=False)
+        get_settings.cache_clear()
+
+
+def test_arena_rejects_empty_or_oversized_prompts(client, monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("ADMIN_EMAILS", "arena-validation-admin@example.com")
+    try:
+        token = _register_and_login(client, "arena-validation-admin@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        empty = client.post(
+            "/api/v1/admin/arena/compare",
+            json={"capability": "TEXT", "prompt": ""},
+            headers=headers,
+        )
+        oversized = client.post(
+            "/api/v1/admin/arena/compare",
+            json={"capability": "TEXT", "prompt": "x" * 4001},
+            headers=headers,
+        )
+
+        assert empty.status_code == 422
+        assert oversized.status_code == 422
+    finally:
+        monkeypatch.delenv("ADMIN_EMAILS", raising=False)
+        get_settings.cache_clear()
+
+
+def test_arena_compare_and_history_are_admin_only(client, monkeypatch, db_session):
+    get_settings.cache_clear()
+    monkeypatch.setenv("ADMIN_EMAILS", "arena-admin@example.com")
+    try:
+        monkeypatch.setattr(
+            "app.api.v1.endpoints.admin.get_llm_client",
+            lambda: MockProvider(replies=["forty two", "42"]),
+        )
+        token = _register_and_login(client, "arena-admin@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+        models = [
+            RegisteredModel(
+                name="arena-one", base_model="arena-one", capability="TEXT", provider="LOCAL",
+                location="ollama://arena-one", status="EXPERIMENTAL",
+            ),
+            RegisteredModel(
+                name="arena-two", base_model="arena-two", capability="TEXT", provider="LOCAL",
+                location="ollama://arena-two", status="CANARY",
+            ),
+        ]
+        db_session.add_all(models)
+        db_session.commit()
+
+        compared = client.post(
+            "/api/v1/admin/arena/compare",
+            json={"capability": "TEXT", "prompt": "What is the answer?", "reference_answer": "42"},
+            headers=headers,
+        )
+        assert compared.status_code == 200
+        body = compared.json()
+        assert len(body) == 2
+        assert {row["model_id"] for row in body} == {str(model.id) for model in models}
+        assert db_session.query(ArenaComparisonResult).count() == 2
+        assert len({row["comparison_id"] for row in body}) == 1
+
+        history = client.get("/api/v1/admin/arena/history?capability=TEXT", headers=headers)
+        assert history.status_code == 200
+        assert len(history.json()) == 2
+
+        non_admin = _register_and_login(client, "arena-user@example.com")
+        forbidden = client.get(
+            "/api/v1/admin/arena/history?capability=TEXT",
+            headers={"Authorization": f"Bearer {non_admin}"},
+        )
+        assert forbidden.status_code == 403
     finally:
         monkeypatch.delenv("ADMIN_EMAILS", raising=False)
         get_settings.cache_clear()

@@ -85,6 +85,37 @@ def test_delete_message_onward_removes_target_and_later_messages(client, db_sess
         app.dependency_overrides.pop(get_llm_client, None)
 
 
+def test_get_message_detail_returns_one_message(client, db_session):
+    app.dependency_overrides[get_llm_client] = lambda: MockProvider(reply="reply")
+    try:
+        token = _register_and_login(client, email="ivy@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        conversation_id = client.post("/api/v1/conversations", json={}, headers=headers).json()["id"]
+        with client.stream(
+            "POST",
+            f"/api/v1/conversations/{conversation_id}/messages",
+            json={"content": "hi"},
+            headers=headers,
+        ) as resp:
+            assert resp.status_code == 200
+            "".join(resp.iter_text())
+
+        messages = client.get(f"/api/v1/conversations/{conversation_id}/messages", headers=headers).json()
+        assistant_id = next(m["id"] for m in messages if m["role"] == "assistant")
+
+        detail = client.get(
+            f"/api/v1/conversations/{conversation_id}/messages/{assistant_id}",
+            headers=headers,
+        )
+        assert detail.status_code == 200
+        assert detail.json()["id"] == assistant_id
+        assert detail.json()["role"] == "assistant"
+        assert detail.json()["content"] == "reply"
+    finally:
+        app.dependency_overrides.pop(get_llm_client, None)
+
+
 def test_message_feedback_set_and_clear(client, db_session):
     app.dependency_overrides[get_llm_client] = lambda: MockProvider(reply="reply")
     try:
@@ -135,6 +166,18 @@ def test_delete_message_onward_requires_ownership(client):
         f"/api/v1/conversations/{conversation_id}/messages/{conversation_id}/onward", headers=headers_b
     )
     assert resp.status_code == 404
+
+
+def test_message_create_uses_a_fresh_image_list_per_instance():
+    from app.schemas.message import MessageCreate
+
+    first = MessageCreate(content="hello")
+    second = MessageCreate(content="there")
+
+    first.image_ids.append("not-a-uuid")
+
+    assert first.image_ids == ["not-a-uuid"]
+    assert second.image_ids == []
 
 
 def test_list_models(client):

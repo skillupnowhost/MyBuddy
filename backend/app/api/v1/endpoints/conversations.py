@@ -131,6 +131,20 @@ def update_conversation(
     return conversation
 
 
+@router.get("/{conversation_id}/messages/{message_id}", response_model=MessageRead)
+def get_message(
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    conversation = _get_owned_conversation(db, conversation_id, user)
+    message = db.get(Message, message_id)
+    if message is None or message.conversation_id != conversation.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
+    return message
+
+
 @router.get("/{conversation_id}/messages/{message_id}/max-candidates", response_model=list[MaxModeCandidateRead])
 def get_max_mode_candidates_for_message(
     conversation_id: uuid.UUID,

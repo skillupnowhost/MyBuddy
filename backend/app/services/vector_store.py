@@ -53,7 +53,11 @@ class PostgresVectorStoreProvider(VectorStoreProvider):
         rows = (
             db.query(DocumentChunk)
             .join(Document, DocumentChunk.document_id == Document.id)
-            .filter(Document.user_id == uuid.UUID(user_id), DocumentChunk.embedding.isnot(None))
+            .filter(
+                Document.user_id == uuid.UUID(user_id),
+                Document.status == "READY",
+                DocumentChunk.embedding.isnot(None),
+            )
             .all()
         )
         if not rows:

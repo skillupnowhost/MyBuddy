@@ -135,8 +135,17 @@ def main() -> int:
     parser.add_argument("--database-url", required=True)
     args = parser.parse_args()
 
-    engine = create_engine(args.database_url)
-    update_job(engine, args.job_id, status="RUNNING")
+    engine = create_engine(
+        args.database_url,
+        connect_args={"connect_timeout": 2},
+        pool_timeout=5,
+    )
+    try:
+        update_job(engine, args.job_id, status="RUNNING")
+    except Exception as exc:  # noqa: BLE001 - fail fast rather than hanging on a missing local DB
+        message = f"Could not connect to the database to start generation: {exc}"
+        print(message, file=sys.stderr)
+        return 1
 
     try:
         image_bytes = run_generation(args)

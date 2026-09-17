@@ -13,13 +13,22 @@ import {
   deleteDataset,
   discoverModels,
   listDatasets,
+  listArenaHistory,
   listRegisteredModels,
   listTrainingJobs,
   promoteModel,
+  runArenaComparison,
   runBenchmark,
   uploadDataset,
 } from "@/lib/training";
-import type { DatasetItem, ModelBenchmarkResultItem, ModelStatus, RegisteredModelItem, TrainingJobItem } from "@/lib/types";
+import type {
+  ArenaComparisonResultItem,
+  DatasetItem,
+  ModelBenchmarkResultItem,
+  ModelStatus,
+  RegisteredModelItem,
+  TrainingJobItem,
+} from "@/lib/types";
 
 const STATUS_COLORS: Record<string, string> = {
   UPLOADED: "text-gray-500",
@@ -45,6 +54,12 @@ export default function FinetunePage() {
   const [error, setError] = useState<string | null>(null);
   const [benchmarking, setBenchmarking] = useState<string | null>(null);
   const [benchmarkResults, setBenchmarkResults] = useState<Record<string, ModelBenchmarkResultItem[]>>({});
+  const [arenaCapability, setArenaCapability] = useState<"TEXT" | "CODE">("TEXT");
+  const [arenaPrompt, setArenaPrompt] = useState("");
+  const [arenaReference, setArenaReference] = useState("");
+  const [arenaResults, setArenaResults] = useState<ArenaComparisonResultItem[]>([]);
+  const [arenaHistory, setArenaHistory] = useState<ArenaComparisonResultItem[]>([]);
+  const [runningArena, setRunningArena] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
@@ -64,7 +79,11 @@ export default function FinetunePage() {
       return;
     }
     getCurrentUser()
-      .then((user) => setIsAdmin(user.role === "ADMIN"))
+      .then((user) => {
+        const admin = user.role === "ADMIN";
+        setIsAdmin(admin);
+        if (admin) loadArenaHistory(arenaCapability);
+      })
       .catch(() => {});
     refresh();
     const interval = setInterval(refresh, 4000);
@@ -127,6 +146,29 @@ export default function FinetunePage() {
       setError(err instanceof Error ? err.message : "Could not run benchmark.");
     } finally {
       setBenchmarking(null);
+    }
+  }
+
+  async function handleArenaCompare() {
+    if (!arenaPrompt.trim()) return;
+    setError(null);
+    setRunningArena(true);
+    try {
+      const results = await runArenaComparison(arenaCapability, arenaPrompt.trim(), arenaReference.trim());
+      setArenaResults(results);
+      setArenaHistory((prev) => [...results, ...prev].slice(0, 50));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not run model arena.");
+    } finally {
+      setRunningArena(false);
+    }
+  }
+
+  async function loadArenaHistory(capability: "TEXT" | "CODE") {
+    try {
+      setArenaHistory(await listArenaHistory(capability));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load arena history.");
     }
   }
 
@@ -319,6 +361,84 @@ export default function FinetunePage() {
             {models.length === 0 && <p className="py-4 text-center text-sm text-gray-400">No registered models yet.</p>}
           </div>
         </section>
+
+        {isAdmin && (
+          <section className="mt-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md">
+            <h2 className="mb-1 text-sm font-medium text-gray-700">Model arena</h2>
+            <p className="mb-3 text-xs text-gray-400">
+              Compare every registered local model for one prompt. Add an expected answer for an automatic score.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <select
+                value={arenaCapability}
+                onChange={(e) => {
+                  const capability = e.target.value as "TEXT" | "CODE";
+                  setArenaCapability(capability);
+                  loadArenaHistory(capability);
+                }}
+                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900"
+              >
+                <option value="TEXT">TEXT</option>
+                <option value="CODE">CODE</option>
+              </select>
+              <input
+                value={arenaPrompt}
+                onChange={(e) => setArenaPrompt(e.target.value)}
+                placeholder="Prompt to compare"
+                className="min-w-64 flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900"
+              />
+              <input
+                value={arenaReference}
+                onChange={(e) => setArenaReference(e.target.value)}
+                placeholder="Expected answer (optional)"
+                className="min-w-52 flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900"
+              />
+              <button
+                onClick={handleArenaCompare}
+                disabled={runningArena || !arenaPrompt.trim()}
+                className="rounded-lg bg-gray-900 px-3 py-2 text-sm text-white hover:bg-gray-700 disabled:opacity-40"
+              >
+                {runningArena ? "Comparing..." : "Compare"}
+              </button>
+            </div>
+            {arenaResults.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {arenaResults.map((result) => {
+                  const model = models.find((candidate) => candidate.id === result.model_id);
+                  return (
+                    <div key={result.id} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-medium text-gray-800">{model?.name || result.model_id}</span>
+                        <span className="text-xs text-gray-400">
+                          {result.score === null ? "human review" : `score ${result.score.toFixed(2)}`} · {result.latency_ms}ms
+                        </span>
+                      </div>
+                      <p className="mt-1 whitespace-pre-wrap text-gray-600">{result.response}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {arenaHistory.length > 0 && (
+              <div className="mt-5 border-t border-gray-100 pt-3">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">Recent arena runs</p>
+                <div className="space-y-1">
+                  {arenaHistory.slice(0, 8).map((result) => {
+                    const model = models.find((candidate) => candidate.id === result.model_id);
+                    return (
+                      <div key={result.id} className="flex items-center justify-between gap-3 text-xs text-gray-500">
+                        <span className="truncate">{model?.name || result.model_id}</span>
+                        <span className="shrink-0">
+                          {result.score === null ? "review" : result.score.toFixed(2)} · {result.latency_ms}ms
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </div>
   );

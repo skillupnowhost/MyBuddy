@@ -50,6 +50,32 @@ def get_document(document_id: uuid.UUID, db: Session = Depends(get_db), user: Us
     return _get_owned_document(db, document_id, user)
 
 
+@router.post("/{document_id}/retry", response_model=DocumentRead, status_code=status.HTTP_202_ACCEPTED)
+def retry_document(
+    document_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    session_factory: Callable[[], Session] = Depends(get_session_factory),
+    embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
+    vector_store: VectorStoreProvider = Depends(get_vector_store),
+):
+    document = _get_owned_document(db, document_id, user)
+    if document.status != "FAILED":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only failed documents can be retried.",
+        )
+
+    document.chunks.clear()
+    document.status = "UPLOADING"
+    document.error_message = None
+    db.commit()
+    db.refresh(document)
+    background_tasks.add_task(_run_ingestion, document.id, session_factory, embedding_provider, vector_store)
+    return document
+
+
 @router.post("", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)
 async def upload_document(
     background_tasks: BackgroundTasks,

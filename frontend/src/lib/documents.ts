@@ -20,3 +20,7 @@ export async function uploadDocument(file: File): Promise<DocumentItem> {
 export async function deleteDocument(id: string): Promise<void> {
   await apiJson(`/api/v1/documents/${id}`, { method: "DELETE" });
 }
+
+export function retryDocument(id: string): Promise<DocumentItem> {
+  return apiJson<DocumentItem>(`/api/v1/documents/${id}/retry`, { method: "POST" });
+}

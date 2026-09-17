@@ -1,5 +1,12 @@
 import { apiFetch, apiJson } from "./api";
-import type { BenchmarkRunResultItem, DatasetItem, ModelBenchmarkResultItem, RegisteredModelItem, TrainingJobItem } from "./types";
+import type {
+  ArenaComparisonResultItem,
+  BenchmarkRunResultItem,
+  DatasetItem,
+  ModelBenchmarkResultItem,
+  RegisteredModelItem,
+  TrainingJobItem,
+} from "./types";
 
 export function listDatasets(): Promise<DatasetItem[]> {
   return apiJson<DatasetItem[]>("/api/v1/datasets");
@@ -57,4 +64,19 @@ export function runBenchmark(id: string): Promise<BenchmarkRunResultItem> {
 
 export function getBenchmarkResults(id: string): Promise<ModelBenchmarkResultItem[]> {
   return apiJson<ModelBenchmarkResultItem[]>(`/api/v1/admin/models/${id}/benchmark`);
+}
+
+export function runArenaComparison(
+  capability: "TEXT" | "CODE",
+  prompt: string,
+  referenceAnswer?: string,
+): Promise<ArenaComparisonResultItem[]> {
+  return apiJson<ArenaComparisonResultItem[]>("/api/v1/admin/arena/compare", {
+    method: "POST",
+    body: JSON.stringify({ capability, prompt, reference_answer: referenceAnswer || null }),
+  });
+}
+
+export function listArenaHistory(capability: "TEXT" | "CODE"): Promise<ArenaComparisonResultItem[]> {
+  return apiJson<ArenaComparisonResultItem[]>(`/api/v1/admin/arena/history?capability=${capability}`);
 }

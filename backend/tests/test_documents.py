@@ -1,10 +1,16 @@
 import io
 import json
+import uuid
+from types import SimpleNamespace
 
+from app.db.models.document import Document
+from app.db.models.document_chunk import DocumentChunk
 from app.main import app
 from app.services.embedding_provider import EmbeddingProvider, get_embedding_provider
 from app.services.llm_client import get_llm_client
 from app.services.mock_provider import MockProvider
+from app.services.rag_service import build_rag_prompt
+from app.services.vector_store import PostgresVectorStoreProvider
 
 
 class FakeEmbeddingProvider(EmbeddingProvider):
@@ -13,6 +19,16 @@ class FakeEmbeddingProvider(EmbeddingProvider):
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
         return [[1.0, 0.0] for _ in texts]
+
+
+class FailingEmbeddingProvider(EmbeddingProvider):
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        raise RuntimeError("embedding service unavailable")
+
+
+class ShortEmbeddingProvider(EmbeddingProvider):
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        return []
 
 
 def _register_and_login(client, email, password="supersecret123"):
@@ -57,6 +73,137 @@ def test_rejects_unsupported_file_type(client):
         files={"file": ("virus.exe", io.BytesIO(b"MZ"), "application/x-msdownload")},
     )
     assert resp.status_code == 415
+
+
+def test_ingestion_failure_marks_document_failed(client):
+    app.dependency_overrides[get_embedding_provider] = lambda: FailingEmbeddingProvider()
+    try:
+        token = _register_and_login(client, "docs-failure@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+        resp = client.post(
+            "/api/v1/documents",
+            headers=headers,
+            files={"file": ("broken.txt", io.BytesIO(b"content that will fail embedding"), "text/plain")},
+        )
+        assert resp.status_code == 201
+
+        detail = client.get(f"/api/v1/documents/{resp.json()['id']}", headers=headers)
+        assert detail.status_code == 200
+        assert detail.json()["status"] == "FAILED"
+        assert detail.json()["error_message"] == "embedding service unavailable"
+    finally:
+        app.dependency_overrides.pop(get_embedding_provider, None)
+
+
+def test_failed_document_can_be_retried(client):
+    app.dependency_overrides[get_embedding_provider] = lambda: FailingEmbeddingProvider()
+    try:
+        token = _register_and_login(client, "docs-retry@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+        resp = client.post(
+            "/api/v1/documents",
+            headers=headers,
+            files={"file": ("retry.txt", io.BytesIO(b"retryable content"), "text/plain")},
+        )
+        document_id = resp.json()["id"]
+        assert client.get(f"/api/v1/documents/{document_id}", headers=headers).json()["status"] == "FAILED"
+
+        app.dependency_overrides[get_embedding_provider] = lambda: FakeEmbeddingProvider()
+        retried = client.post(f"/api/v1/documents/{document_id}/retry", headers=headers)
+        assert retried.status_code == 202
+        assert retried.json()["status"] in {"UPLOADING", "READY"}
+        assert client.get(f"/api/v1/documents/{document_id}", headers=headers).json()["status"] == "READY"
+    finally:
+        app.dependency_overrides.pop(get_embedding_provider, None)
+
+
+def test_document_retry_rejects_non_failed_document(client):
+    app.dependency_overrides[get_embedding_provider] = lambda: FakeEmbeddingProvider()
+    try:
+        token = _register_and_login(client, "docs-no-retry@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+        resp = client.post(
+            "/api/v1/documents",
+            headers=headers,
+            files={"file": ("ready.txt", io.BytesIO(b"ready content"), "text/plain")},
+        )
+        retry = client.post(f"/api/v1/documents/{resp.json()['id']}/retry", headers=headers)
+        assert retry.status_code == 409
+    finally:
+        app.dependency_overrides.pop(get_embedding_provider, None)
+
+
+def test_ingestion_rejects_incomplete_embedding_batch(client):
+    app.dependency_overrides[get_embedding_provider] = lambda: ShortEmbeddingProvider()
+    try:
+        token = _register_and_login(client, "docs-short-embedding@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+        resp = client.post(
+            "/api/v1/documents",
+            headers=headers,
+            files={"file": ("partial.txt", io.BytesIO(b"content with no vector"), "text/plain")},
+        )
+        assert resp.status_code == 201
+
+        detail = client.get(f"/api/v1/documents/{resp.json()['id']}", headers=headers)
+        assert detail.status_code == 200
+        assert detail.json()["status"] == "FAILED"
+        assert "returned 0 vectors for 1 chunks" in detail.json()["error_message"]
+    finally:
+        app.dependency_overrides.pop(get_embedding_provider, None)
+
+
+def test_rag_prompt_includes_document_filename_and_page():
+    chunk = SimpleNamespace(
+        document=SimpleNamespace(filename="handbook.pdf"),
+        content="The answer is in this passage.",
+        page_number=4,
+    )
+
+    prompt = build_rag_prompt("What is the answer?", [chunk])
+
+    assert "[Source: handbook.pdf, page 4]" in prompt
+    assert "The answer is in this passage." in prompt
+
+
+def test_vector_retrieval_excludes_failed_documents(db_session):
+    user_id = uuid.uuid4()
+    ready_document = Document(
+        user_id=user_id,
+        filename="ready.txt",
+        content_type="text/plain",
+        size_bytes=1,
+        storage_path="/tmp/ready.txt",
+        status="READY",
+    )
+    failed_document = Document(
+        user_id=user_id,
+        filename="failed.txt",
+        content_type="text/plain",
+        size_bytes=1,
+        storage_path="/tmp/failed.txt",
+        status="FAILED",
+    )
+    db_session.add_all([ready_document, failed_document])
+    db_session.flush()
+    ready_chunk = DocumentChunk(
+        document_id=ready_document.id,
+        content="ready content",
+        chunk_index=0,
+        embedding=[1.0, 0.0],
+    )
+    failed_chunk = DocumentChunk(
+        document_id=failed_document.id,
+        content="failed content",
+        chunk_index=0,
+        embedding=[1.0, 0.0],
+    )
+    db_session.add_all([ready_chunk, failed_chunk])
+    db_session.commit()
+
+    matches = PostgresVectorStoreProvider().query(db_session, str(user_id), [1.0, 0.0], top_k=10)
+
+    assert [match.chunk_id for match in matches] == [str(ready_chunk.id)]
 
 
 def test_document_access_is_isolated_per_user(client, db_session):

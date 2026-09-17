@@ -54,12 +54,17 @@ async def ingest_document(
             db.refresh(row)
 
         embeddings = await embedding_provider.embed([row.content for row in chunk_rows])
+        if len(embeddings) != len(chunk_rows):
+            raise ValueError(
+                f"Embedding provider returned {len(embeddings)} vectors for {len(chunk_rows)} chunks."
+            )
         vector_store.add(db, {str(row.id): embedding for row, embedding in zip(chunk_rows, embeddings)})
 
         document.status = "READY"
         db.commit()
     except Exception as exc:  # noqa: BLE001 - ingestion failures must surface as document status, not crash
         logger.exception("Failed to ingest document %s", document.id)
+        db.rollback()
         document.status = "FAILED"
         document.error_message = str(exc)[:2000]
         db.commit()
@@ -94,7 +99,9 @@ def build_rag_prompt(user_question: str, chunks: list[DocumentChunk]) -> str:
 
     context_blocks = []
     for chunk in chunks:
-        source = f"page {chunk.page_number}" if chunk.page_number else "document"
+        source = chunk.document.filename
+        if chunk.page_number:
+            source += f", page {chunk.page_number}"
         context_blocks.append(f"[Source: {source}]\n{chunk.content}")
     context = "\n\n---\n\n".join(context_blocks)
 
